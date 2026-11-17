@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chompers</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0a16; color: #8a86a8; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center;
+         font: 11px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; outline: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+  footer { padding: 6px 16px; opacity: .65; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="320" height="200" tabindex="0"></canvas>
+<footer id="footer">not affiliated with Number Munchers™ / MECC · for personal play.</footer>
+<script>
+"use strict";
+
+/* =====================================================================
+ * 1. CONFIG / DATA
+ *    Everything tunable lives here. Edit freely by hand.
+ * ===================================================================== */
+
+const CONFIG = {
+  title: 'Chompers',                 // rename the game here (+ <title> tag)
+  view: { width: 320, height: 200 }, // logical canvas resolution
+  grid: { cols: 6, rows: 5 },
+  startLives: 3,
+  mode: 'multiples',                 // active mode id (see MODES)
+
+  scoring: {
+    correct: 5,       // points per correct eat, multiplied by level
+    levelBonus: 10,   // bonus on level clear, multiplied by level
+  },
+
+  board: {
+    correctRatio: 0.45, // chance each cell is a correct answer
+    minCorrect: 6,      // guarantee at least this many correct cells
+  },
+
+  timing: {             // milliseconds
+    wrongLock: 1500,    // input locked + error message shown after a wrong eat
+    goodFlash: 450,     // "+points" pop after a correct eat
+    chomp: 180,         // mouth-open animation
+    levelClear: 1800,   // "level clear" banner before next level
+    gameOverGuard: 700, // ignore input briefly on game-over screen
+  },
+
+  // Per-level parameters for each mode. Past the end, the list repeats
+  // (level 11 uses entry 1 again, etc.).
+  levels: {
+    multiples: [
+      { n: 2,  max: 20  },
+      { n: 5,  max: 50  },
+      { n: 3,  max: 30  },
+      { n: 10, max: 100 },
+      { n: 4,  max: 40  },
+      { n: 6,  max: 60  },
+      { n: 9,  max: 90  },
+      { n: 7,  max: 70  },
+      { n: 8,  max: 96  },
+      { n: 12, max: 144 },
+    ],
+  },
+
+  palette: {
+    bg:         '#141226',
+    panel:      '#1f1b3a',
+    cell:       '#2a2552',
+    cellEdge:   '#463e8c',
+    cellEaten:  '#18152f',
+    number:     '#ece8ff',
+    dim:        '#8a86a8',
+    accent:     '#ffd25a',
+    good:       '#5de08a',
+    bad:        '#ff5a6e',
+    // creature
+    outline:    '#0e0c1c',
+    body:       '#42c6a8',
+    bodyHurt:   '#ff7a88',
+    eye:        '#ffffff',
+    mouth:      '#0e0c1c',
+    tooth:      '#ffffff',
+  },
+};
+
+// A mode = a rule for which numbers are "correct".
+//   title(p)                  -> header text for level params p
+//   isCorrect(value, p)       -> boolean
+//   makeValue(p, want, rnd)   -> a value that is correct iff want===true
+//   explain(value, p)         -> short message shown after a wrong eat
+// rnd(lo, hi) returns an integer in [lo, hi].
+const MODES = {
+  multiples: {
+    title: p => `Multiples of ${p.n}`,
+    isCorrect: (v, p) => v % p.n === 0,
+    makeValue(p, want, rnd) {
+      if (want) return p.n * rnd(1, Math.floor(p.max / p.n));
+      let v;
+      do { v = rnd(1, p.max); } while (v % p.n === 0);
+      return v;
+    },
+    explain: (v, p) => `${v} is not a multiple of ${p.n}`,
+  },
+};
+
+
+/* =====================================================================
+ * 2. ENGINE
+ *    Pure game state + rules. No DOM / canvas / keyboard here.
+ *    Driven by Engine.handle(action) and Engine.update(dtMs).
+ *    Actions: up down left right eat pause confirm blur
+ * ===================================================================== */
+
+const Engine = (() => {
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+
+  const state = {
+    screen: 'title',      // title | playing | paused | levelclear | gameover
+    modeId: CONFIG.mode,
+    params: null,         // current level params
+    level: 1,
+    score: 0,
+    lives: CONFIG.startLives,
+    cells: [],            // [{ value, eaten }], row-major
+    remaining: 0,         // correct cells left on the board
+    player: { col: 0, row: 0, chompT: 0 },
+    lockT: 0,             // input lock remaining (ms)
+    screenT: 0,           // timer for levelclear / gameover
+    flash: null,          // { kind:'good'|'bad', t, dur, cell, msg }
+    lastBonus: 0,
+  };
+
+  const mode = () => MODES[state.modeId];
+  const idx = (c, r) => r * CONFIG.grid.cols + c;
+
+  function levelParams(level) {
+    const list = CONFIG.levels[state.modeId];
+    return list[(level - 1) % list.length];
+  }
+
+  function buildBoard() {
+    const { cols, rows } = CONFIG.grid;
+    const total = cols * rows;
+    const m = mode(), p = state.params;
+    const want = [];
+    for (let i = 0; i < total; i++) want.push(Math.random() < CONFIG.board.correctRatio);
+    let count = want.filter(Boolean).length;
+    const minC = Math.min(CONFIG.board.minCorrect, total);
+    while (count < minC) {
+      const i = rnd(0, total - 1);
+      if (!want[i]) { want[i] = true; count++; }
+    }
+    state.cells = want.map(w => ({ value: m.makeValue(p, w, rnd), eaten: false }));
+    state.remaining = state.cells.filter(c => m.isCorrect(c.value, p)).length;
+  }
+
+  function startLevel() {
+    state.params = levelParams(state.level);
+    buildBoard();
+    state.player.col = Math.floor(CONFIG.grid.cols / 2);
+    state.player.row = Math.floor(CONFIG.grid.rows / 2);
+    state.player.chompT = 0;
+    state.lockT = 0;
+    state.flash = null;
+    state.screen = 'playing';
+  }
+
+  function newGame() {
+    state.modeId = CONFIG.mode;
+    state.level = 1;
+    state.score = 0;
+    state.lives = CONFIG.startLives;
+    startLevel();
+  }
+
+  function move(dir) {
+    const [dx, dy] = DIRS[dir];
+    const p = state.player;
+    p.col = Math.max(0, Math.min(CONFIG.grid.cols - 1, p.col + dx));
+    p.row = Math.max(0, Math.min(CONFIG.grid.rows - 1, p.row + dy));
+  }
+
+  function eat() {
+    const p = state.player, i = idx(p.col, p.row), cell = state.cells[i];
+    if (cell.eaten) return;
+    p.chompT = CONFIG.timing.chomp;
+    if (mode().isCorrect(cell.value, state.params)) {
+      cell.eaten = true;
+      const pts = CONFIG.scoring.correct * state.level;
+      state.score += pts;
+      state.remaining--;
+      state.flash = { kind: 'good', t: CONFIG.timing.goodFlash, dur: CONFIG.timing.goodFlash, cell: i, msg: '+' + pts };
+      if (state.remaining <= 0) {
+        state.lastBonus = CONFIG.scoring.levelBonus * state.level;
+        state.score += state.lastBonus;
+        state.screen = 'levelclear';
+        state.screenT = CONFIG.timing.levelClear;
+      }
+    } else {
+      state.lives--;
+      state.flash = { kind: 'bad', t: CONFIG.timing.wrongLock, dur: CONFIG.timing.wrongLock, cell: i,
+                      msg: mode().explain(cell.value, state.params) };
+      state.lockT = CONFIG.timing.wrongLock;
+    }
+  }
+
+  function handle(action) {
+    const s = state;
+    if (action === 'blur') { if (s.screen === 'playing') s.screen = 'paused'; return; }
+    const go = action === 'eat' || action === 'confirm';
+    switch (s.screen) {
+      case 'title':    if (go) newGame(); break;
+      case 'gameover': if (go && s.screenT <= 0) s.screen = 'title'; break;
+      case 'paused':   if (action === 'pause' || go) s.screen = 'playing'; break;
+      case 'levelclear': break;
+      case 'playing':
+        if (action === 'pause') { s.screen = 'paused'; return; }
+        if (s.lockT > 0) return;
+        if (DIRS[action]) move(action);
+        else if (action === 'eat') eat();
+        break;
+    }
+  }
+
+  function update(dt) {
+    const s = state;
+    if (s.screen === 'playing') {
+      if (s.player.chompT > 0) s.player.chompT = Math.max(0, s.player.chompT - dt);
+      if (s.flash) { s.flash.t -= dt; if (s.flash.t <= 0) s.flash = null; }
+      if (s.lockT > 0) {
+        s.lockT -= dt;
+        if (s.lockT <= 0) {
+          s.lockT = 0;
+          if (s.lives <= 0) { s.screen = 'gameover'; s.screenT = CONFIG.timing.gameOverGuard; }
+        }
+      }
+    } else if (s.screen === 'levelclear') {
+      if (s.player.chompT > 0) s.player.chompT = Math.max(0, s.player.chompT - dt);
+      if (s.flash) { s.flash.t -= dt; if (s.flash.t <= 0) s.flash = null; }
+      s.screenT -= dt;
+      if (s.screenT <= 0) { s.level++; startLevel(); }
+    } else if (s.screen === 'gameover') {
+      if (s.screenT > 0) s.screenT -= dt;
+    }
+  }
+
+  return { state, handle, update, mode };
+})();
+
+
+/* =====================================================================
+ * 3. RENDER
+ *    Draws Engine.state onto a fixed 320x200 canvas, scaled to fit.
+ *    Read-only with respect to game state.
+ * ===================================================================== */
+
+const Render = (() => {
+  const W = CONFIG.view.width, H = CONFIG.view.height, P = CONFIG.palette;
+  const canvas = document.getElementById('screen');
+  const footer = document.getElementById('footer');
+  const ctx = canvas.getContext('2d');
+  canvas.width = W; canvas.height = H;
+
+  // Layout (derived from grid size so CONFIG.grid can change)
+  const HEADER_H = 18, HUD_H = 22, MARGIN = 10;
+  const cellW = Math.floor((W - 2 * MARGIN) / CONFIG.grid.cols);
+  const cellH = Math.floor((H - HEADER_H - HUD_H - 4) / CONFIG.grid.rows);
+  const gridX = Math.floor((W - cellW * CONFIG.grid.cols) / 2);
+  const gridY = HEADER_H + 2;
+
+  // ---- 5x7 bitmap font (original, each row is a 5-bit mask) ----
+  const FONT = {
+    '0':[14,17,19,21,25,17,14], '1':[4,12,4,4,4,4,14], '2':[14,17,1,2,4,8,31], '3':[31,2,4,2,1,17,14],
+    '4':[2,6,10,18,31,2,2], '5':[31,16,30,1,1,17,14], '6':[6,8,16,30,17,17,14], '7':[31,1,2,4,8,8,8],
+    '8':[14,17,17,14,17,17,14], '9':[14,17,17,15,1,2,12],
+    'A':[14,17,17,31,17,17,17], 'B':[30,17,17,30,17,17,30], 'C':[14,17,16,16,16,17,14], 'D':[28,18,17,17,17,18,28],
+    'E':[31,16,16,30,16,16,31], 'F':[31,16,16,30,16,16,16], 'G':[14,17,16,23,17,17,15], 'H':[17,17,17,31,17,17,17],
+    'I':[14,4,4,4,4,4,14], 'J':[7,2,2,2,2,18,12], 'K':[17,18,20,24,20,18,17], 'L':[16,16,16,16,16,16,31],
+    'M':[17,27,21,21,17,17,17], 'N':[17,17,25,21,19,17,17], 'O':[14,17,17,17,17,17,14], 'P':[30,17,17,30,16,16,16],
+    'Q':[14,17,17,17,21,18,13], 'R':[30,17,17,30,20,18,17], 'S':[15,16,16,14,1,1,30], 'T':[31,4,4,4,4,4,4],
+    'U':[17,17,17,17,17,17,14], 'V':[17,17,17,17,17,10,4], 'W':[17,17,17,21,21,21,10], 'X':[17,17,10,4,10,17,17],
+    'Y':[17,17,10,4,4,4,4], 'Z':[31,1,2,4,8,16,31],
+    ' ':[0,0,0,0,0,0,0], ':':[0,12,12,0,12,12,0], '.':[0,0,0,0,0,12,12], ',':[0,0,0,0,12,4,8],
+    '-':[0,0,0,31,0,0,0], '+':[0,4,4,31,4,4,0], '=':[0,0,31,0,31,0,0], '!':[4,4,4,4,4,0,4],
+    '?':[14,17,1,2,4,0,4], '/':[0,1,2,4,8,16,0], "'":[4,4,8,0,0,0,0], '(':[2,4,8,8,8,4,2],
+    ')':[8,4,2,2,2,4,8], '·':[0,0,0,12,12,0,0], '×':[0,17,10,4,10,17,0],
+  };
+  const textWidth = (s, scale = 1) => s.length ? (s.length * 6 - 1) * scale : 0;
+
+  function text(str, x, y, color, scale = 1, align = 'left') {
+    str = String(str).toUpperCase();
+    if (align === 'center') x -= Math.floor(textWidth(str, scale) / 2);
+    else if (align === 'right') x -= textWidth(str, scale);
+    ctx.fillStyle = color;
+    for (const ch of str) {
+      const g = FONT[ch] || FONT['?'];
+      for (let r = 0; r < 7; r++) {
+        const bits = g[r];
+        if (!bits) continue;
+        for (let c = 0; c < 5; c++) if (bits & (16 >> c)) ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+      }
+      x += 6 * scale;
+    }
+  }
+
+  // ---- Original creature sprite ("the chomper"), 14x12 ----
+  // o outline · b body · w eye white · k pupil/mouth · t tooth
+  const SPR_IDLE = [
+    '....oooooo....',
+    '..oobbbbbboo..',
+    '.obbbbbbbbbbo.',
+    '.obwwbbbbwwbo.',
+    'obbwkbbbbwkbbo',
+    'obbbbbbbbbbbbo',
+    'obbkbbbbbbkbbo',
+    'obbbkkkkkkbbbo',
+    '.obbbbbbbbbbo.',
+    '..oobbbbbboo..',
+    '...ooo..ooo...',
+  ];
+  const SPR_CHOMP = [
+    '....oooooo....',
+    '..oobbbbbboo..',
+    '.obwwbbbbwwbo.',
+    'obbwkbbbbwkbbo',
+    'obkkkkkkkkkkbo',
+    'obktktktktktbo',
+    'obkkkkkkkkkkbo',
+    'obkkkkkkkkkkbo',
+    'obbtktktktkbbo',
+    '.obbkkkkkkbbo.',
+    '..oobbbbbboo..',
+    '...ooo..ooo...',
+  ];
+  function sprite(rows, x, y, scale, hurt) {
+    const map = { o: P.outline, b: hurt ? P.bodyHurt : P.body, w: P.eye, k: P.mouth, t: P.tooth };
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      for (let c = 0; c < row.length; c++) {
+        const col = map[row[c]];
+        if (!col) continue;
+        ctx.fillStyle = col;
+        ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+      }
+    }
+  }
+
+  function rect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+  function frame(x, y, w, h, color) {
+    rect(x, y, w, 1, color); rect(x, y + h - 1, w, 1, color);
+    rect(x, y, 1, h, color); rect(x + w - 1, y, 1, h, color);
+  }
+  function dim(alpha = 0.7) { ctx.fillStyle = `rgba(8,6,20,${alpha})`; ctx.fillRect(0, 0, W, H); }
+  function banner(lines, color = P.accent) {
+    // lines: [{ s, scale, color }]
+    const pad = 8;
+    let h = pad, w = 0;
+    for (const l of lines) { h += 7 * (l.scale || 1) + 5; w = Math.max(w, textWidth(l.s.toUpperCase(), l.scale || 1)); }
+    h += pad - 5; w += pad * 2;
+    const x = Math.floor((W - w) / 2), y = Math.floor((H - h) / 2);
+    rect(x, y, w, h, P.panel); frame(x, y, w, h, color);
+    let yy = y + pad;
+    for (const l of lines) { text(l.s, W / 2, yy, l.color || color, l.scale || 1, 'center'); yy += 7 * (l.scale || 1) + 5; }
+  }
+
+  // ---- screens ----
+  function drawTitle(t) {
+    rect(0, 0, W, H, P.bg);
+    text(CONFIG.title, W / 2, 30, P.accent, 4, 'center');
+    text('Eat the right numbers!', W / 2, 66, P.dim, 1, 'center');
+    const bob = Math.round(Math.sin(t / 250) * 3);
+    const chomping = Math.floor(t / 400) % 3 === 0;
+    sprite(chomping ? SPR_CHOMP : SPR_IDLE, W / 2 - 21, 84 + bob, 3, false);
+    if (Math.floor(t / 500) % 2 === 0) text('Press Space to start', W / 2, 136, P.number, 1, 'center');
+    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 166, P.dim, 1, 'center');
+  }
+
+  function drawBoard(s, t) {
+    rect(0, 0, W, H, P.bg);
+    const m = Engine.mode();
+
+    // header
+    rect(0, 0, W, HEADER_H, P.panel);
+    text(m.title(s.params), MARGIN, 6, P.accent);
+    text('Level ' + s.level, W - MARGIN, 6, P.number, 1, 'right');
+
+    // grid
+    const bad = s.flash && s.flash.kind === 'bad';
+    for (let r = 0; r < CONFIG.grid.rows; r++) {
+      for (let c = 0; c < CONFIG.grid.cols; c++) {
+        const i = r * CONFIG.grid.cols + c, cell = s.cells[i];
+        const x = gridX + c * cellW, y = gridY + r * cellH;
+        const flashing = s.flash && s.flash.cell === i;
+        let fill = cell.eaten ? P.cellEaten : P.cell;
+        if (flashing && s.flash.kind === 'bad' && Math.floor(s.flash.t / 120) % 2 === 0) fill = P.bad;
+        if (flashing && s.flash.kind === 'good') fill = P.good;
+        rect(x + 1, y + 1, cellW - 2, cellH - 2, fill);
+        frame(x, y, cellW, cellH, P.cellEdge);
+        const here = s.player.col === c && s.player.row === r;
+        if (!cell.eaten) {
+          if (here) text(cell.value, x + 4, y + 4, P.number, 1);
+          else text(cell.value, x + cellW / 2, y + Math.floor((cellH - 14) / 2), P.number, 2, 'center');
+        }
+      }
+    }
+    frame(gridX - 1, gridY - 1, cellW * CONFIG.grid.cols + 2, cellH * CONFIG.grid.rows + 2, bad ? P.bad : P.cellEdge);
+
+    // player
+    const px = gridX + s.player.col * cellW, py = gridY + s.player.row * cellH;
+    const spr = s.player.chompT > 0 ? SPR_CHOMP : SPR_IDLE;
+    const sw = 14 * 2, sh = spr.length * 2;
+    sprite(spr, px + cellW - sw - 3, py + cellH - sh - 1, 2, bad);
+
+    // "+points" pop
+    if (s.flash && s.flash.kind === 'good') {
+      const k = 1 - s.flash.t / s.flash.dur;
+      const fc = s.flash.cell % CONFIG.grid.cols, fr = Math.floor(s.flash.cell / CONFIG.grid.cols);
+      text(s.flash.msg, gridX + fc * cellW + cellW / 2, gridY + fr * cellH - Math.round(k * 10), P.good, 1, 'center');
+    }
+
+    // HUD
+    const hudY = H - HUD_H;
+    rect(0, hudY, W, HUD_H, P.panel);
+    text('Score ' + String(s.score).padStart(5, '0'), MARGIN, hudY + 8, P.number);
+    for (let i = 0; i < CONFIG.startLives; i++) {
+      const x = W - MARGIN - 14 - i * 17;
+      if (i < s.lives) sprite(SPR_IDLE, x, hudY + 5, 1, false);
+      else frame(x + 3, hudY + 8, 8, 6, P.cellEdge);
+    }
+
+    // wrong-eat message
+    if (bad) banner([{ s: s.flash.msg, color: P.bad }], P.bad);
+  }
+
+  function draw(s, t) {
+    switch (s.screen) {
+      case 'title': drawTitle(t); break;
+      case 'playing': drawBoard(s, t); break;
+      case 'paused':
+        drawBoard(s, t); dim();
+        text('Paused', W / 2, 74, P.accent, 3, 'center');
+        text('Esc or Space to resume', W / 2, 108, P.number, 1, 'center');
+        break;
+      case 'levelclear':
+        drawBoard(s, t);
+        banner([{ s: 'Level clear!', scale: 2 }, { s: 'Bonus +' + s.lastBonus, color: P.number }]);
+        break;
+      case 'gameover':
+        rect(0, 0, W, H, P.bg);
+        text('Game over', W / 2, 46, P.bad, 3, 'center');
+        text('Score ' + s.score, W / 2, 90, P.number, 2, 'center');
+        text('Reached level ' + s.level, W / 2, 112, P.dim, 1, 'center');
+        if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 150, P.accent, 1, 'center');
+        break;
+    }
+  }
+
+  // Integer scaling for crisp pixels; fractional only if the window is tiny.
+  function fit() {
+    const availW = window.innerWidth - 8;
+    const availH = window.innerHeight - footer.offsetHeight - 8;
+    let s = Math.min(availW / W, availH / H);
+    s = s >= 1 ? Math.floor(s) : s;
+    canvas.style.width = Math.floor(W * s) + 'px';
+    canvas.style.height = Math.floor(H * s) + 'px';
+  }
+
+  return { draw, fit, canvas };
+})();
+
+
+/* =====================================================================
+ * 4. INPUT
+ *    Physical input -> abstract actions -> Engine.handle(action).
+ *    A touch layer can be added later by calling emit('up'), emit('eat'), ...
+ * ===================================================================== */
+
+const Input = (() => {
+  const KEYMAP = {
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    Space: 'eat',
+    Enter: 'confirm', NumpadEnter: 'confirm',
+    Escape: 'pause', KeyP: 'pause',
+  };
+  const REPEATABLE = new Set(['up', 'down', 'left', 'right']);
+
+  function emit(action) { Engine.handle(action); }
+
+  window.addEventListener('keydown', e => {
+    const action = KEYMAP[e.code];
+    if (!action) return;
+    e.preventDefault();
+    if (e.repeat && !REPEATABLE.has(action)) return;
+    emit(action);
+  });
+  window.addEventListener('blur', () => emit('blur'));
+  Render.canvas.addEventListener('pointerdown', () => Render.canvas.focus());
+
+  return { emit };
+})();
+
+
+/* ---- boot + main loop ---- */
+document.title = CONFIG.title;
+window.Chompers = { CONFIG, MODES, Engine, Input };
+window.addEventListener('resize', Render.fit);
+Render.fit();
+Render.canvas.focus();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(100, now - last);
+  last = now;
+  Engine.update(dt);
+  Render.draw(Engine.state, now);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
