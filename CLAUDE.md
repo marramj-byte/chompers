@@ -21,6 +21,12 @@ No server, no build step, no dependencies.
 (exit code 1 on any failure). Screenshots land in `tests/out/` (gitignored). Playwright is the only
 requirement and is not vendored; it is test-only, the game itself has no dependencies.
 
+## Hosting
+- The repo is deployed as-is by Cloudflare Pages on every push to `main` (no build command, output directory is the repo root). Live at https://chompers.realmarras.com/.
+- `_redirects` at the root sends `/` to `/chompers.html`. It must stay exactly one line, and `chompers.html` must keep its name. Never delete, rename, or reformat either; never add an `index.html`.
+- Everything committed to `main` is publicly served, so no secrets, scratch files, or large assets in the repo. Test screenshots stay in `tests/out/` (already gitignored).
+- Nothing about the game itself changes for hosting: single file, no dependencies, no server.
+
 ## Conventions
 - **Single file:** everything lives in `chompers.html` — inline CSS and JS, no external assets or libraries.
 - **Four clearly commented sections, in this order:**
