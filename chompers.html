@@ -38,6 +38,7 @@ const CONFIG = {
   board: {
     correctRatio: 0.45, // chance each cell is a correct answer
     minCorrect: 6,      // guarantee at least this many correct cells
+    maxChars: 6,        // longest cell text (numbers or expressions); RENDER fits up to 6
   },
 
   timing: {             // milliseconds
@@ -90,6 +91,28 @@ const CONFIG = {
       { n: 8,  max: 160, safeCell: true,  enemies: { count: 4, types: ['wanderer', 'stalker'],            spawnDelay: 2500, tickMult: 0.8  } },
       { n: 12, max: 240, safeCell: true,  enemies: { count: 4, types: ['wanderer', 'stalker', 'stalker'], spawnDelay: 2000, tickMult: 0.75 } },
     ],
+    factors: [ // ns: N is picked from this list each level; max: largest number shown
+      { ns: [12],     max: 40,  safeCell: false },
+      { ns: [18, 20], max: 50,  safeCell: false },
+      { ns: [24],     max: 60,  safeCell: true,  enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
+      { ns: [30, 36], max: 80,  safeCell: true,  enemies: { count: 2, types: ['wanderer'],            spawnDelay: 3500, tickMult: 1.0 } },
+      { ns: [48],     max: 100, safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
+      { ns: [60, 72], max: 120, safeCell: true,  enemies: { count: 3, types: ['wanderer', 'stalker'], spawnDelay: 3000, tickMult: 0.9 } },
+    ],
+    primes: [
+      { max: 30,  safeCell: false },
+      { max: 50,  safeCell: false },
+      { max: 75,  safeCell: true,  enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
+      { max: 100, safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
+    ],
+    equals: [
+      { variant: 'eq', ns: [10, 12], ops: ['+', '−'],           operand: [1, 15], safeCell: false },
+      { variant: 'lt', ns: [10, 12], ops: ['+', '−'],           operand: [1, 12], safeCell: false },
+      { variant: 'gt', ns: [15, 20], ops: ['+', '−', '×'],      operand: [1, 10], safeCell: true, enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
+      { variant: 'eq', ns: [12, 24], ops: ['×', '+'],           operand: [1, 12], safeCell: true, enemies: { count: 2, types: ['wanderer'],            spawnDelay: 3500, tickMult: 1.0 } },
+      { variant: 'lt', ns: [30],     ops: ['×', '÷'],           operand: [2, 10], safeCell: true, enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
+      { variant: 'gt', ns: [50],     ops: ['+', '−', '×', '÷'], operand: [2, 12], safeCell: true, enemies: { count: 3, types: ['wanderer', 'stalker'], spawnDelay: 3000, tickMult: 0.9 } },
+    ],
   },
 
   palette: {
@@ -116,14 +139,52 @@ const CONFIG = {
   },
 };
 
-// A mode = a rule for which numbers are "correct".
-//   title(p)                  -> header text for level params p
+// ---- small pure math helpers used by MODES ----
+const MathUtil = {
+  isPrime(v) {
+    if (!Number.isInteger(v) || v < 2) return false;
+    for (let d = 2; d * d <= v; d++) if (v % d === 0) return false;
+    return true;
+  },
+  factors(n) {
+    const out = [];
+    for (let d = 1; d <= n; d++) if (n % d === 0) out.push(d);
+    return out;
+  },
+  // "a<op>b" with op one of + − × ÷  ->  its integer value, or NaN if malformed
+  // or not a whole number. (ASCII - * x / are accepted too.)
+  evalExpr(s) {
+    const m = /^(\d+)\s*([+\-−×x*÷/])\s*(\d+)$/.exec(String(s));
+    if (!m) return NaN;
+    const a = Number(m[1]), b = Number(m[3]);
+    switch (m[2]) {
+      case '+': return a + b;
+      case '-': case '−': return a - b;
+      case 'x': case '*': case '×': return a * b;
+      default: return b !== 0 && a % b === 0 ? a / b : NaN;
+    }
+  },
+  pick: (list, rnd) => list[rnd(0, list.length - 1)],
+};
+
+// A mode = a rule for which cells are "correct". Four required functions:
+//   title(p)                  -> header text for level params p         ("header")
 //   isCorrect(value, p)       -> boolean
-//   makeValue(p, want, rnd)   -> a value that is correct iff want===true
-//   explain(value, p)         -> short message shown after a wrong eat
+//   makeValue(p, want, rnd)   -> a cell value that is correct iff want   ("generate")
+//                                (may return null if it can't make one; the engine retries)
+//   explain(value, p)         -> short message shown after a wrong eat  ("wrongMessage")
+// Optional:
+//   name                      -> label for menus / game-over screen
+//   setup(p, rnd)             -> turns a level entry into concrete params once per level
+//                                (e.g. picks N from a list). Default: use the entry as-is.
+// Cell values may be numbers or short strings (expressions); uniqueness on a board is by
+// displayed text, and every value must fit in board.maxChars characters.
 // rnd(lo, hi) returns an integer in [lo, hi].
+const pickN = (p, rnd) => ({ ...p, n: Array.isArray(p.ns) ? MathUtil.pick(p.ns, rnd) : p.n });
+
 const MODES = {
   multiples: {
+    name: 'Multiples',
     title: p => `Multiples of ${p.n}`,
     isCorrect: (v, p) => v % p.n === 0,
     makeValue(p, want, rnd) {
@@ -133,6 +194,110 @@ const MODES = {
       return v;
     },
     explain: (v, p) => `${v} is not a multiple of ${p.n}`,
+  },
+
+  // Level params: ns (list of N to pick from, or n), max (largest number shown).
+  factors: {
+    name: 'Factors',
+    // Chance a WRONG cell is drawn from each near-miss pool; the rest is random fill.
+    nearMiss: {
+      neighbours: 0.3,     // factors of N-1 and N+1 that don't divide N
+      primeMultiples: 0.4, // multiples of 2, 3, 5, 7 that don't divide N
+    },
+    setup: pickN,
+    title: p => `Factors of ${p.n}`,
+    isCorrect: (v, p) => v >= 1 && p.n % v === 0,
+    makeValue(p, want, rnd) {
+      if (want) return MathUtil.pick(MathUtil.factors(p.n), rnd);
+      const ok = v => v >= 1 && v <= p.max && p.n % v !== 0;
+      const r = Math.random();
+      let pool = null;
+      if (r < this.nearMiss.neighbours) {
+        pool = [...MathUtil.factors(p.n - 1), ...MathUtil.factors(p.n + 1)];
+      } else if (r < this.nearMiss.neighbours + this.nearMiss.primeMultiples) {
+        pool = [];
+        for (const q of [2, 3, 5, 7]) for (let v = q; v <= p.max; v += q) pool.push(v);
+      }
+      if (pool) {
+        pool = pool.filter(ok);
+        if (pool.length) return MathUtil.pick(pool, rnd);
+      }
+      let v;
+      do { v = rnd(1, p.max); } while (!ok(v));
+      return v;
+    },
+    explain: (v, p) => `${v} is not a factor of ${p.n}`,
+  },
+
+  // Level params: max (numbers 1..max).
+  primes: {
+    name: 'Primes',
+    // Chance a WRONG cell is a near-miss: 1 or an odd composite (9, 15, 21, 27, 33, 39, 49, 51, 57, 91...).
+    nearMissChance: 0.6,
+    title: () => 'Primes',
+    isCorrect: v => MathUtil.isPrime(v),
+    makeValue(p, want, rnd) {
+      let v;
+      if (want) {
+        do { v = rnd(2, p.max); } while (!MathUtil.isPrime(v));
+        return v;
+      }
+      if (Math.random() < this.nearMissChance) {
+        const pool = [1];
+        for (let x = 9; x <= p.max; x += 2) if (!MathUtil.isPrime(x)) pool.push(x);
+        return MathUtil.pick(pool, rnd);
+      }
+      do { v = rnd(1, p.max); } while (MathUtil.isPrime(v));
+      return v;
+    },
+    explain(v) {
+      if (v < 2) return `${v} is not prime`;
+      let d = 2;
+      while (v % d) d++;
+      return `${v} = ${d}×${v / d}, not prime`;
+    },
+  },
+
+  // Level params: variant ('eq' | 'lt' | 'gt'), ns (targets to pick from, or n),
+  //   ops (any of '+', '−', '×', '÷'), operand [lo, hi].
+  // Cells are expressions "a op b". Both operands come from the operand range,
+  // except ÷, where the divisor and the RESULT do (so the dividend can be larger).
+  // Subtraction never goes negative; division is always exact.
+  equals: {
+    name: 'Equals/Inequality',
+    variants: { eq: 'Equal to', lt: 'Less than', gt: 'Greater than' },
+    nearMissChance: 0.5, // chance a WRONG cell's value lands within nearMissSpread of N
+    nearMissSpread: 3,
+    setup: pickN,
+    title(p) { return `${this.variants[p.variant]} ${p.n}`; },
+    isCorrect(v, p) {
+      const x = MathUtil.evalExpr(v);
+      if (p.variant === 'lt') return x < p.n;
+      if (p.variant === 'gt') return x > p.n;
+      return x === p.n;
+    },
+    randomExpr(p, rnd) {
+      const [lo, hi] = p.operand;
+      const op = MathUtil.pick(p.ops, rnd);
+      let a = rnd(lo, hi), b = rnd(lo, hi);
+      if (op === '−' && a < b) [a, b] = [b, a];
+      if (op === '÷') { b = Math.max(1, b); a *= b; } // a was the quotient
+      const s = `${a}${op}${b}`;
+      return s.length <= CONFIG.board.maxChars ? s : null;
+    },
+    makeValue(p, want, rnd) {
+      const near = !want && Math.random() < this.nearMissChance;
+      for (let i = 0; i < 400; i++) {
+        const s = this.randomExpr(p, rnd);
+        if (s === null || this.isCorrect(s, p) !== want) continue;
+        if (near && i < 200 && Math.abs(MathUtil.evalExpr(s) - p.n) > this.nearMissSpread) continue;
+        return s;
+      }
+      return null;
+    },
+    explain(v, p) {
+      return `${v} = ${MathUtil.evalExpr(v)}, not ${this.variants[p.variant].toLowerCase()} ${p.n}`;
+    },
   },
 };
 
@@ -240,10 +405,12 @@ const Engine = (() => {
 
   // ---------- numbers ----------
   // A value not in `used` whose correctness == want, or null if none turns up.
+  // (Small ranges, e.g. primes to 30 on a 30-cell board, need many tries for the last cells.)
   function uniqueValue(want, used) {
-    for (let tries = 0; tries < 500; tries++) {
-      const v = mode().makeValue(state.params, want, rnd);
-      if (!used.has(v)) return v;
+    const m = mode();
+    for (let tries = 0; tries < 2000; tries++) {
+      const v = m.makeValue(state.params, want, rnd);
+      if (v !== null && v !== undefined && !used.has(v)) return v;
     }
     return null;
   }
@@ -265,13 +432,21 @@ const Engine = (() => {
       if (!want[i]) { want[i] = true; count++; }
     }
     const used = new Set();
+    const exhausted = { true: false, false: false }; // stop asking for a kind the range has run out of
+    const draw = w => {
+      if (exhausted[w]) return null;
+      const v = uniqueValue(w, used);
+      if (v === null) exhausted[w] = true;
+      return v;
+    };
     state.cells = want.map(w => {
-      const v = uniqueValue(w, used) ?? uniqueValue(!w, used);
+      const v = draw(w) ?? draw(!w);
       if (v === null) throw new Error(`Level ${state.level}: number range too small for ${total} unique cells`);
       used.add(v);
       return { value: v, eaten: false, fxT: 0 };
     });
     state.remaining = countRemaining();
+    if (state.remaining < minC) console.warn(`Level ${state.level}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this level's range`);
   }
 
   // A number-altering Grump stepped on cell i: give it a new number that is
@@ -302,7 +477,8 @@ const Engine = (() => {
   }
 
   function startLevel() {
-    state.params = levelParams(state.level);
+    const raw = levelParams(state.level);
+    state.params = mode().setup ? mode().setup(raw, rnd) : raw;
     buildBoard();
     centrePlayer();
     state.player.chompT = 0;
@@ -589,23 +765,47 @@ const Render = (() => {
     '-':[0,0,0,31,0,0,0], '+':[0,4,4,31,4,4,0], '=':[0,0,31,0,31,0,0], '!':[4,4,4,4,4,0,4],
     '?':[14,17,1,2,4,0,4], '/':[0,1,2,4,8,16,0], "'":[4,4,8,0,0,0,0], '(':[2,4,8,8,8,4,2],
     ')':[8,4,2,2,2,4,8], '·':[0,0,0,12,12,0,0], '×':[0,17,10,4,10,17,0],
+    '−':[0,0,0,31,0,0,0], '÷':[0,4,0,31,0,4,0], '<':[2,4,8,16,8,4,2], '>':[8,4,2,1,2,4,8],
   };
-  const textWidth = (s, scale = 1) => s.length ? (s.length * 6 - 1) * scale : 0;
+  // Condensed 3x7 digits/operators (3-bit rows) for long cell text, e.g. "100÷10".
+  // Same height as FONT, so a condensed cell lines up with its neighbours.
+  const FONT_C = {
+    '0':[7,5,5,5,5,5,7], '1':[2,6,2,2,2,2,7], '2':[7,1,1,7,4,4,7], '3':[7,1,1,7,1,1,7],
+    '4':[5,5,5,7,1,1,1], '5':[7,4,4,7,1,1,7], '6':[7,4,4,7,5,5,7], '7':[7,1,1,2,2,2,2],
+    '8':[7,5,5,7,5,5,7], '9':[7,5,5,7,1,1,7],
+    '+':[0,0,2,7,2,0,0], '−':[0,0,0,7,0,0,0], '-':[0,0,0,7,0,0,0], '×':[0,0,5,2,5,0,0], '÷':[0,2,0,7,0,2,0],
+  };
+  const glyph = (ch, condensed) => condensed && FONT_C[ch]
+    ? { g: FONT_C[ch], w: 3 } : { g: FONT[ch] || FONT['?'], w: 5 };
+  function textWidth(str, scale = 1, condensed = false) {
+    let w = 0;
+    for (const ch of String(str).toUpperCase()) w += glyph(ch, condensed).w + 1;
+    return w ? (w - 1) * scale : 0;
+  }
 
-  function text(str, x, y, color, scale = 1, align = 'left') {
+  function text(str, x, y, color, scale = 1, align = 'left', condensed = false) {
     str = String(str).toUpperCase();
-    if (align === 'center') x -= Math.floor(textWidth(str, scale) / 2);
-    else if (align === 'right') x -= textWidth(str, scale);
+    if (align === 'center') x -= Math.floor(textWidth(str, scale, condensed) / 2);
+    else if (align === 'right') x -= textWidth(str, scale, condensed);
     ctx.fillStyle = color;
     for (const ch of str) {
-      const g = FONT[ch] || FONT['?'];
+      const { g, w } = glyph(ch, condensed);
       for (let r = 0; r < 7; r++) {
         const bits = g[r];
         if (!bits) continue;
-        for (let c = 0; c < 5; c++) if (bits & (16 >> c)) ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+        for (let c = 0; c < w; c++) if (bits & (1 << (w - 1 - c))) ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
       }
-      x += 6 * scale;
+      x += (w + 1) * scale;
     }
+  }
+
+  // Cell text rule (both sizes): up to 3 characters use the normal font; longer
+  // strings (expressions, up to board.maxChars = 6) use the condensed font.
+  // Big: scale 2, 3 chars = 35px, 6 condensed = 46px, inside a 48px cell.
+  // Small (cell shared with a sprite): scale 1, top-left, on a dark plate.
+  const condensedFor = str => String(str).length > 3;
+  function cellText(str, x, y, color, scale, align) {
+    text(str, x, y, color, scale, align, condensedFor(str));
   }
 
   // ---- Original creature sprite ("the chomper"), 14x12 ----
@@ -736,6 +936,7 @@ const Render = (() => {
     const occupied = new Set(s.enemies.map(e => e.row * CONFIG.grid.cols + e.col));
     occupied.add(s.player.row * CONFIG.grid.cols + s.player.col);
     const safeVisible = s.safe && (s.safe.t > CONFIG.safeCell.blinkBefore || Math.floor(s.safe.t / 150) % 2 === 0);
+    const smallLabels = []; // drawn after the sprites so long expressions stay readable
     for (let r = 0; r < CONFIG.grid.rows; r++) {
       for (let c = 0; c < CONFIG.grid.cols; c++) {
         const i = r * CONFIG.grid.cols + c, cell = s.cells[i];
@@ -750,12 +951,12 @@ const Render = (() => {
         frame(x, y, cellW, cellH, P.cellEdge);
         if (safeHere) {
           frame(x + 2, y + 2, cellW - 4, cellH - 4, P.safeEdge);
-          sprite(SAFE_ICON, x + cellW - 10, y + 4, 1, { o: P.safeEdge });
+          sprite(SAFE_ICON, x + cellW - 10, y + 3, 1, { o: P.safeEdge }); // rows y+3..7, clear of cell text at y+8
         }
         if (cell.fxT > 0) frame(x + 1, y + 1, cellW - 2, cellH - 2, P.rewrite);
         if (!cell.eaten) {
-          if (occupied.has(i)) text(cell.value, x + 4, y + 4, P.number, 1);
-          else text(cell.value, x + cellW / 2, y + Math.floor((cellH - 14) / 2), P.number, 2, 'center');
+          if (occupied.has(i)) smallLabels.push({ str: cell.value, x: x + 4, y: y + 4 });
+          else cellText(cell.value, x + cellW / 2, y + Math.floor((cellH - 14) / 2), P.number, 2, 'center');
         }
       }
     }
@@ -784,6 +985,12 @@ const Render = (() => {
     } else {
       const spr = s.player.chompT > 0 ? SPR_CHOMP : SPR_IDLE;
       sprite(spr, px + cellW - sw - 3, py + cellH - spr.length * 2 - 1, 2, creatureMap(bad));
+    }
+
+    // numbers under the player / Grumps
+    for (const l of smallLabels) {
+      rect(l.x - 1, l.y - 1, textWidth(l.str, 1, condensedFor(l.str)) + 2, 9, P.panel);
+      cellText(l.str, l.x, l.y, P.number, 1, 'left');
     }
 
     // "+points" pop
@@ -884,7 +1091,7 @@ const Input = (() => {
 
 /* ---- boot + main loop ---- */
 document.title = CONFIG.title;
-window.Chompers = { CONFIG, MODES, ENEMY_TYPES, Engine, Input };
+window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, Engine, Input };
 window.addEventListener('resize', Render.fit);
 Render.fit();
 Render.canvas.focus();

@@ -43,6 +43,38 @@ function pageHelpers() {
       const E = Chompers.Engine, s = E.state, m = E.mode();
       return s.cells.filter(c => !c.eaten && m.isCorrect(c.value, s.params)).length;
     },
+    // independent check of an expression's value (plain JS arithmetic)
+    jsEval(v) {
+      const js = String(v).replace('×', '*').replace('÷', '/').replace('−', '-');
+      if (!/^\d+[-+*/]\d+$/.test(js)) return NaN;
+      return Function('return (' + js + ')')();
+    },
+    // null if value v is a legal cell for mode id with params p, else a reason
+    invalid(id, v, p) {
+      const { CONFIG } = Chompers;
+      if (String(v).length > CONFIG.board.maxChars) return `"${v}" longer than ${CONFIG.board.maxChars}`;
+      if (id === 'equals') {
+        const m = /^(\d+)([+−×÷])(\d+)$/.exec(v);
+        if (typeof v !== 'string' || !m) return `"${v}" is not an expression`;
+        const a = +m[1], op = m[2], b = +m[3], x = T.jsEval(v);
+        if (!Number.isInteger(x) || x < 0) return `"${v}" = ${x} (not a whole number >= 0)`;
+        if (!p.ops.includes(op)) return `"${v}" uses ${op}, not in ${p.ops}`;
+        const [lo, hi] = p.operand, inR = n => n >= lo && n <= hi;
+        if (op === '÷' ? !(inR(x) && b >= Math.max(1, lo) && b <= hi) : !(inR(a) && inR(b))) return `"${v}" operands outside ${lo}..${hi}`;
+        return null;
+      }
+      if (!Number.isInteger(v) || v < 1 || v > p.max) return `${v} outside 1..${p.max}`;
+      return null;
+    },
+    // full validity check of the current board
+    boardProblem() {
+      const { CONFIG, Engine: E } = Chompers, s = E.state, id = s.modeId;
+      const shown = s.cells.filter(c => !c.eaten).map(c => String(c.value));
+      if (new Set(shown).size !== shown.length) return 'duplicate cell text';
+      if (s.remaining !== T.recount()) return 'remaining out of sync';
+      for (const c of s.cells) { const bad = T.invalid(id, c.value, s.params); if (bad) return bad; }
+      return null;
+    },
     isEdge(e) {
       const { cols, rows } = Chompers.CONFIG.grid;
       return e.col === 0 || e.row === 0 || e.col === cols - 1 || e.row === rows - 1;
@@ -313,6 +345,100 @@ function pageHelpers() {
   check(rw.full.rewrites > 0 && rw.full.changed, `Wanderers rewrite numbers as they walk (${rw.full.rewrites} rewrites in 60 s)`);
   check(rw.full.err === null, 'full board: rewrites keep numbers unique and correct cells >= minCorrect' + (rw.full.err ? ` (${rw.full.err})` : ''));
   check(rw.low.err === null, 'nearly-cleared board (2 left): rewrites never reduce the correct count or end the level' + (rw.low.err ? ` (${rw.low.err})` : ''));
+
+  // ===================== modes =====================
+  console.log('-- modes');
+  await fresh();
+  const boards = await page.evaluate(() => {
+    const { CONFIG, MODES, Engine: E } = Chompers, out = {};
+    for (const id of Object.keys(MODES)) {
+      CONFIG.mode = id;
+      const r = { boards: 0, problems: [], minCorrect: Infinity };
+      for (let L = 1; L <= CONFIG.levels[id].length; L++) for (let k = 0; k < 200; k++) {
+        E.debug.gotoLevel(L); r.boards++;
+        r.minCorrect = Math.min(r.minCorrect, E.state.remaining);
+        const bad = T.boardProblem();
+        if (bad && r.problems.length < 3) r.problems.push(`level ${L}: ${bad}`);
+      }
+      out[id] = r;
+    }
+    return out;
+  });
+  for (const [id, r] of Object.entries(boards)) {
+    check(r.problems.length === 0, `${id}: ${r.boards} boards (200 per level) unique, in range, <= maxChars` + (r.problems.length ? ' ' + JSON.stringify(r.problems) : ''));
+    check(r.minCorrect >= 6, `${id}: every board has >= board.minCorrect correct cells (lowest seen ${r.minCorrect})`);
+  }
+
+  const exprs = await page.evaluate(() => {
+    const { CONFIG, MODES, MathUtil, Engine: E } = Chompers, m = MODES.equals;
+    const fixed = { '3+9': 12, '4×3': 12, '15−3': 12, '24÷2': 12, '7÷2': NaN, '2−9': -7, '12x12': 144, '9-4': 5, '8/2': 4, 'abc': NaN };
+    const fixedBad = Object.entries(fixed).filter(([s, v]) => !Object.is(MathUtil.evalExpr(s), v));
+    let checked = 0, mismatches = [];
+    CONFIG.mode = 'equals';
+    for (let L = 1; L <= CONFIG.levels.equals.length; L++) {
+      E.debug.gotoLevel(L);
+      const p = E.state.params;
+      for (let k = 0; k < 500; k++) {
+        const s = m.randomExpr(p, (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1)));
+        if (s === null) continue;
+        checked++;
+        if (MathUtil.evalExpr(s) !== T.jsEval(s) && mismatches.length < 3) mismatches.push(s);
+      }
+    }
+    const msgs = [
+      m.explain('4×3', { variant: 'lt', n: 10 }),
+      m.explain('3+9', { variant: 'eq', n: 10 }),
+      m.explain('15−3', { variant: 'gt', n: 20 }),
+      MODES.primes.explain(91), MODES.primes.explain(1), MODES.factors.explain(9, { n: 24 }),
+    ];
+    const titles = [MODES.equals.title({ variant: 'eq', n: 10 }), MODES.equals.title({ variant: 'lt', n: 10 }),
+                    MODES.equals.title({ variant: 'gt', n: 10 }), MODES.factors.title({ n: 24 }), MODES.primes.title({})];
+    return { fixedBad, checked, mismatches, msgs, titles };
+  });
+  check(exprs.fixedBad.length === 0, 'evalExpr: hand-checked cases (3+9, 4×3, 15−3, 24÷2, 7÷2 -> NaN, ...)' + (exprs.fixedBad.length ? ' ' + JSON.stringify(exprs.fixedBad) : ''));
+  check(exprs.mismatches.length === 0, `evalExpr matches plain JS arithmetic on ${exprs.checked} generated expressions`);
+  check(exprs.msgs[0] === '4×3 = 12, not less than 10' && exprs.msgs[1] === '3+9 = 12, not equal to 10' && exprs.msgs[2] === '15−3 = 12, not greater than 20',
+        'wrong-eat messages show the evaluated value: ' + exprs.msgs.slice(0, 3).join(' | '));
+  check(exprs.msgs[3] === '91 = 7×13, not prime' && exprs.msgs[4] === '1 is not prime' && exprs.msgs[5] === '9 is not a factor of 24',
+        'primes / factors wrong-eat messages: ' + exprs.msgs.slice(3).join(' | '));
+  check(exprs.titles.join('|') === 'Equal to 10|Less than 10|Greater than 10|Factors of 24|Primes', 'headers: ' + exprs.titles.join(' | '));
+
+  const nearMiss = await page.evaluate(() => {
+    const { CONFIG, MathUtil, Engine: E } = Chompers;
+    CONFIG.mode = 'primes';
+    let wrong = 0, near = 0;
+    for (let k = 0; k < 100; k++) {
+      E.debug.gotoLevel(4); // primes to 100
+      for (const c of E.state.cells) if (!MathUtil.isPrime(c.value)) { wrong++; if (c.value === 1 || c.value % 2) near++; }
+    }
+    // baseline: share of 1 + odd composites among all non-primes in 1..100
+    let base = 0, all = 0;
+    for (let v = 1; v <= 100; v++) if (!MathUtil.isPrime(v)) { all++; if (v === 1 || v % 2) base++; }
+    return { share: near / wrong, base: base / all };
+  });
+  check(nearMiss.share > nearMiss.base + 0.2, `primes over-represent near-misses (${Math.round(nearMiss.share * 100)}% of wrong cells vs ${Math.round(nearMiss.base * 100)}% by chance)`);
+
+  const rewrites = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state, out = {};
+    for (const [id, L] of [['multiples', 6], ['factors', 4], ['primes', 3], ['equals', 4], ['equals', 6]]) {
+      CONFIG.mode = id;
+      E.debug.gotoLevel(L);
+      E.debug.placePlayer(2, 2); E.debug.setSafe(2, 2, 1e9);
+      s.enemyCfg = { ...s.enemyCfg, count: 2, types: ['wanderer'] }; // only number-altering Grumps
+      s.spawnT = 0;
+      let n = 0;
+      const err = T.sim(30000, () => {
+        if (s.screen !== 'playing') return 'screen ' + s.screen;
+        if (s.remaining < CONFIG.board.minCorrect) return 'correct cells below minCorrect';
+        for (const c of s.cells) if (c.fxT === CONFIG.timing.rewriteFlash) n++;
+        return T.boardProblem();
+      });
+      out[`${id}#${L}`] = { err, rewrites: n };
+    }
+    return out;
+  });
+  for (const [k, r] of Object.entries(rewrites))
+    check(r.err === null && r.rewrites > 0, `${k}: Wanderer rewrites use the mode's generator (${r.rewrites} rewrites, board stays valid)` + (r.err ? ` (${r.err})` : ''));
 
   // ===================== screenshot of a busy level =====================
   await fresh();
