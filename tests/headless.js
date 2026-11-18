@@ -90,7 +90,14 @@ function pageHelpers() {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   const shot = name => page.screenshot({ path: path.join(OUT, name + '.png') });
-  const fresh = async () => { await page.goto(URL); await page.waitForTimeout(150); };
+  // fresh(): reload with empty localStorage; reload(): reload keeping it (persistence checks)
+  const fresh = async () => {
+    await page.goto(URL);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(URL);
+    await page.waitForTimeout(150);
+  };
+  const reload = async () => { await page.goto(URL); await page.waitForTimeout(150); };
   const S = () => page.evaluate(() => {
     const s = Chompers.Engine.state;
     return { screen: s.screen, lives: s.lives, level: s.level, score: s.score };
@@ -128,6 +135,12 @@ function pageHelpers() {
   await page.waitForTimeout(200);
   await shot('04-clear');
   check((await S()).screen === 'levelclear', 'clearing all correct cells shows level clear');
+  const stats = await page.evaluate(() => {
+    const s = Chompers.Engine.state;
+    return { ...s.levelStats, eaten: s.cells.filter(c => c.eaten).length };
+  });
+  check(stats.correct === stats.eaten && stats.wrong === 1 && stats.ms > 1000,
+        `stage-clear stats: ${stats.correct} correct, ${stats.wrong} wrong, ${(stats.ms / 1000).toFixed(1)} s`);
   await page.waitForTimeout(2000);
   st = await S();
   check(st.screen === 'playing' && st.level === 2, 'advances to level 2');
@@ -139,7 +152,10 @@ function pageHelpers() {
   check((await S()).screen === 'playing', 'Esc resumes');
 
   for (let k = 0; k < 3; k++) { await goTo(false); await page.keyboard.press('Space'); await page.waitForTimeout(1600); }
-  check((await S()).screen === 'gameover', 'losing all lives ends the game');
+  check((await S()).screen === 'entername', 'losing all lives with a top-5 score goes to name entry');
+  await page.waitForTimeout(800);
+  await page.keyboard.press('Space'); await page.waitForTimeout(100);
+  check((await S()).screen === 'gameover', 'Space saves the initials and shows game over');
   await page.waitForTimeout(800);
   await shot('06-gameover');
   await page.keyboard.press('Space'); await page.waitForTimeout(100);
@@ -589,6 +605,246 @@ function pageHelpers() {
   await shot('10-gameover-practice');
   check(over.screen === 'gameover' && over.label === 'Practice: Primes' && over.stage === 3,
         `game-over screen data: "${over.label}", "Stage ${over.stage}: ${over.title}" (see tests/out/10-gameover-practice.png)`);
+
+  // ===================== polish: high scores =====================
+  console.log('-- high scores');
+  await fresh();
+  const hs = await page.evaluate(() => {
+    const { Engine: E, CONFIG } = Chompers, H = E.Hiscores, cap = CONFIG.hiscores.perTrack;
+    let list = [];
+    const ranks = [];
+    for (const [name, score] of [['AAA', 50], ['BBB', 10], ['CCC', 30], ['DDD', 30], ['EEE', 70], ['FFF', 20], ['GGG', 5]]) {
+      const r = H.insert(list, { name, score, stage: 1 }, cap);
+      list = r.list; ranks.push(r.rank);
+    }
+    const full = list.map(e => e.name + e.score).join(' ');
+    const q = { empty0: H.qualifies([], 0, cap), empty1: H.qualifies([], 1, cap),
+                tieLast: H.qualifies(list, list[cap - 1].score, cap), beatLast: H.qualifies(list, list[cap - 1].score + 1, cap) };
+    const clean = H.sanitize({
+      campaign: [{ name: 'ZZZ', score: 5, stage: 2 }, { name: 'abc', score: 99, stage: 1 }, { name: 'TOOLONG', score: 99, stage: 1 },
+                 { name: 'NEG', score: -4, stage: 1 }, { name: 'STR', score: '80', stage: 1 }, { name: 'TOP', score: 900, stage: 9 },
+                 { name: 'MID', score: 40, stage: 3 }, null, 7, { name: 'A1', score: 3, stage: 1 },
+                 { name: 'X', score: 1, stage: 1 }, { name: 'LOW', score: 2, stage: 1 }, { name: 'LOX', score: 1, stage: 1 },
+                 { name: 'OUT', score: 1, stage: 0 }],
+      primes: 'not a list', bogusTrack: [{ name: 'BAD', score: 9, stage: 1 }],
+    }, CONFIG.menu, cap);
+    return { full, ranks, q, clean, tracks: Object.keys(clean) };
+  });
+  check(hs.full === 'EEE70 AAA50 CCC30 DDD30 FFF20', `insert keeps best-first order, ties stay in arrival order, capped at 5 (${hs.full})`);
+  check(JSON.stringify(hs.ranks) === '[0,1,1,2,0,4,-1]', `insert returns the new rank, -1 when it falls off (${hs.ranks})`);
+  check(!hs.q.empty0 && hs.q.empty1 && !hs.q.tieLast && hs.q.beatLast, 'qualifies: >0 on an empty table; must beat (not tie) the last of a full one');
+  check(hs.clean.campaign.map(e => e.name).join() === 'TOP,MID,ZZZ,LOW,LOX' && hs.clean.primes.length === 0
+        && hs.tracks.join() === 'campaign,multiples,factors,primes,equals',
+        `sanitize drops bad entries/tracks, sorts and caps (${hs.clean.campaign.map(e => e.name + e.score).join(' ')})`);
+
+  const rt = await page.evaluate(() => {
+    const { Storage, CONFIG } = Chompers;
+    const data = { hiscores: { campaign: [{ name: 'RTX', score: 123, stage: 4 }] }, muted: true, initials: 'RTX' };
+    const ok = Storage.save(data);
+    const back = Storage.load();
+    const raw = JSON.parse(localStorage.getItem(CONFIG.storage.key));
+    localStorage.setItem(CONFIG.storage.key, JSON.stringify({ ...raw, version: 999 }));
+    const wrongVersion = Storage.load();
+    localStorage.setItem(CONFIG.storage.key, '{not json');
+    const corrupt = Storage.load();
+    localStorage.removeItem(CONFIG.storage.key);
+    return { ok, same: JSON.stringify({ version: CONFIG.storage.version, ...data }) === JSON.stringify(back),
+             keys: Object.keys(localStorage), wrongVersion, corrupt, key: CONFIG.storage.key };
+  });
+  check(rt.ok && rt.same, `Storage round-trip under one versioned key ("${rt.key}")`);
+  check(rt.wrongVersion === null && rt.corrupt === null, 'other versions and corrupt JSON load as "nothing saved"');
+
+  // real game -> name entry with the arrow keys -> saved -> survives a reload
+  const loseWithScore = () => page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state, m = E.mode();
+    s.spawnT = 1e9;
+    const eatWhere = want => {
+      const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
+      E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+      E.handle('eat');
+    };
+    eatWhere(true); eatWhere(true);
+    for (let k = 0; k < CONFIG.startLives; k++) { eatWhere(false); T.sim(CONFIG.timing.wrongLock + 50); }
+    T.sim(CONFIG.timing.gameOverGuard + 50);
+    return { screen: s.screen, score: s.score };
+  });
+  await page.keyboard.press('Space');                    // campaign
+  const lost = await loseWithScore();
+  check(lost.screen === 'entername' && lost.score > 0, `a top-5 score (${lost.score}) asks for initials`);
+  for (const k of ['ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowRight', 'ArrowDown']) await page.keyboard.press(k);
+  await page.waitForTimeout(50);
+  await shot('11-name-entry');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(60);
+  const saved = await page.evaluate(() => {
+    const s = Chompers.Engine.state;
+    return { screen: s.screen, top: s.hiscores.campaign[0], newEntry: s.newEntry,
+             stored: JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key)) };
+  });
+  await shot('12-gameover-highlight');
+  check(saved.screen === 'gameover' && saved.top && saved.top.name === 'ACZ' && saved.newEntry && saved.newEntry.rank === 0,
+        `initials entered with Up/Down/Left/Right ("${saved.top && saved.top.name}") and highlighted as rank 1 on game over`);
+  check(saved.stored && saved.stored.hiscores.campaign[0].name === 'ACZ', 'the new entry is written to localStorage immediately');
+  await reload();
+  const restored = await page.evaluate(() => {
+    const s = Chompers.Engine.state;
+    return { top: s.hiscores.campaign[0], initials: s.initials, primes: s.hiscores.primes.length };
+  });
+  await shot('13-title-hiscores');
+  check(restored.top && restored.top.name === 'ACZ' && restored.top.score === lost.score && restored.initials === 'ACZ' && restored.primes === 0,
+        'after a reload: table restored, last initials remembered, other tracks untouched');
+  // a second game in practice goes into its own table
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('Space');
+  await loseWithScore();
+  await page.keyboard.press('Space'); await page.waitForTimeout(60);
+  const second = await page.evaluate(() => {
+    const h = Chompers.Engine.state.hiscores;
+    return { campaign: h.campaign.length, multiples: h.multiples.map(e => e.name) };
+  });
+  check(second.campaign === 1 && second.multiples.join() === 'ACZ', 'tables are per track (practice score went to Multiples, initials pre-filled)');
+
+  // ===================== polish: mute =====================
+  console.log('-- mute');
+  await fresh();
+  const muteState = () => page.evaluate(() => ({ state: Chompers.Engine.state.muted, sound: Chompers.Sound.isMuted(),
+    stored: (JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key) || 'null') || {}).muted }));
+  const m0 = await muteState();
+  await page.keyboard.press('KeyM'); await page.waitForTimeout(60);
+  const m1 = await muteState();
+  await reload();
+  const m2 = await muteState();
+  await page.keyboard.press('KeyM'); await page.waitForTimeout(60);
+  await reload();
+  const m3 = await muteState();
+  check(m0.state === false && m1.state && m1.sound && m1.stored === true, 'M mutes (engine, synth and saved state agree)');
+  check(m2.state && m2.sound, 'mute survives a reload');
+  check(!m3.state && !m3.sound && m3.stored === false, 'M again unmutes, and that survives a reload too');
+
+  // ===================== polish: sound + events + feel =====================
+  console.log('-- sound, events, feel');
+  await fresh();
+  await page.keyboard.press('KeyX');                     // any key: unlocks audio
+  await page.waitForTimeout(100);
+  const snd = await page.evaluate(() => {
+    const { Sound } = Chompers;
+    const played = Sound.names.map(n => [n, Sound.play(n)]);
+    Sound.setMuted(true);
+    const whileMuted = Sound.names.some(n => Sound.play(n));
+    Sound.setMuted(false);
+    return { unlocked: Sound.stats.unlocked, played, whileMuted };
+  });
+  check(snd.unlocked && snd.played.every(([, ok]) => ok), `all ${snd.played.length} synth effects play after the first key press (${snd.played.map(p => p[0]).join(', ')})`);
+  check(!snd.whileMuted, 'nothing plays while muted');
+
+  const ev = await page.evaluate(() => {
+    const { CONFIG, Engine: E, ENEMY_TYPES } = Chompers, s = E.state;
+    E.debug.gotoLevel(6); E.drainEvents();
+    const got = new Set();
+    const take = () => E.drainEvents().forEach(e => got.add(e));
+    E.handle(s.player.col > 0 ? 'left' : 'right'); take();
+    const m = E.mode();
+    let i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
+    E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); take();
+    i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
+    E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); take();
+    T.sim(CONFIG.timing.wrongLock + 50); take();
+    s.spawnT = 0; s.safeT = 0; T.sim(32); take();      // spawn + safe cell
+    ENEMY_TYPES.stalker.randomStepChance = 0;
+    s.enemies = []; E.debug.setSafe(null, null, 1e9);
+    E.debug.spawn('stalker', s.player.col + 1 < 6 ? s.player.col + 1 : s.player.col - 1, s.player.row).tickT = 0;
+    T.sim(32); take();                                  // death
+    s.screen = 'title'; E.handle('down'); take();       // menu
+    return [...got].sort();
+  });
+  check(['correct', 'death', 'menu', 'move', 'safe', 'spawn', 'wrong'].every(e => ev.includes(e)), `engine emits sound events: ${ev.join(', ')}`);
+
+  const feel = await page.evaluate(() => {
+    const { CONFIG, Engine: E, Loop, Render } = Chompers, s = E.state;
+    const out = {};
+    for (const on of [true, false]) {
+      CONFIG.feel.hitStop = on;
+      E.debug.gotoLevel(1); E.drainEvents();
+      const m = E.mode(), i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
+      E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat');
+      out['hit' + on] = [Loop.step(16), Loop.step(16)];
+    }
+    CONFIG.feel.hitStop = true;
+    // death flash: draw the first frame of a death and sample a background pixel
+    const px = () => Array.from(document.getElementById('screen').getContext('2d').getImageData(2, 100, 1, 1).data.slice(0, 3));
+    for (const on of [true, false]) {
+      CONFIG.feel.deathFlash = on;
+      E.debug.gotoLevel(5); s.enemies = []; s.spawnT = 1e9; E.debug.setSafe(null, null, 1e9);
+      const g = E.debug.spawn('wanderer', s.player.col + 1, s.player.row); g.tickT = 1e9;
+      E.handle('right');
+      Render.draw(s, performance.now());
+      out['flash' + on] = px();
+    }
+    CONFIG.feel.deathFlash = true;
+    return out;
+  });
+  const bright = rgb => rgb.reduce((a, b) => a + b, 0);
+  check(JSON.stringify(feel.hittrue) === '[false,true]' && JSON.stringify(feel.hitfalse) === '[true,true]',
+        `hit-stop holds exactly ${1} frame after a correct eat, and is off when CONFIG.feel.hitStop is false`);
+  check(bright(feel.flashtrue) > 400 && bright(feel.flashfalse) < 150,
+        `death screen flash (rgb ${feel.flashtrue}) and none with CONFIG.feel.deathFlash off (rgb ${feel.flashfalse})`);
+
+  // ===================== polish: attract mode =====================
+  console.log('-- attract mode');
+  await fresh();
+  // leave a finished game behind so there is real state to protect
+  await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(4, 'factors'); s.spawnT = 1e9;
+    const m = E.mode();
+    for (let k = 0; k < CONFIG.startLives; k++) {
+      const i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
+      E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); T.sim(CONFIG.timing.wrongLock + 50);
+    }
+    T.sim(CONFIG.timing.gameOverGuard + 50);
+    E.handle('confirm');                                  // game over -> title
+    s.menuIndex = 2;
+  });
+  const gameSnap = () => page.evaluate(() => {
+    const skip = new Set(['screen', 'idleT', 'attract', 'events']);
+    const s = Chompers.Engine.state;
+    return JSON.stringify(Object.fromEntries(Object.entries(s).filter(([k]) => !skip.has(k))))
+      + '|' + localStorage.getItem(Chompers.CONFIG.storage.key);
+  });
+  const before = await gameSnap();
+  const att = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    s.idleT = 0;                                        // ignore real frames that ran between steps
+    T.sim(CONFIG.attract.idleMs - 500);
+    const early = s.screen;
+    T.sim(600);
+    const entered = s.screen;
+    const pos0 = s.attract && JSON.stringify(s.attract.enemies.map(e => [e.col, e.row]));
+    T.sim(6000);
+    const moved = s.attract && JSON.stringify(s.attract.enemies.map(e => [e.col, e.row])) !== pos0;
+    return { early, entered, moved, grumps: s.attract ? s.attract.enemies.length : 0, player: s.attract && 'player' in s.attract };
+  });
+  await page.waitForTimeout(60);
+  await shot('14-attract');
+  const mid = await gameSnap();
+  await page.keyboard.press('KeyQ');                    // any key
+  await page.waitForTimeout(60);
+  const exited = await page.evaluate(() => ({ screen: Chompers.Engine.state.screen, attract: Chompers.Engine.state.attract }));
+  const afterExit = await gameSnap();
+  check(att.early === 'title' && att.entered === 'attract', `attract demo starts after ${20} s idle on the title, not before`);
+  check(att.moved && att.grumps > 0 && !att.player, `demo board: ${att.grumps} Grumps wandering, no player`);
+  check(exited.screen === 'title' && exited.attract === null, 'any key returns to the title');
+  check(before === mid && mid === afterExit, 'game state, high scores, menu selection and storage are identical before, during and after the demo');
+  const auto = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    T.sim(CONFIG.attract.idleMs + 100);
+    const on = s.screen;
+    T.sim(CONFIG.attract.durationMs + 100);
+    const off = s.screen;
+    E.handle('down');                                   // title input resets the idle timer
+    T.sim(CONFIG.attract.idleMs - 1000);
+    return { on, off, stillTitle: s.screen };
+  });
+  check(auto.on === 'attract' && auto.off === 'title' && auto.stillTitle === 'title', 'the demo loops back to the title by itself; input on the title resets the idle timer');
 
   // ===================== screenshot of a busy level =====================
   await fresh();

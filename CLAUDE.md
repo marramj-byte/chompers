@@ -20,6 +20,12 @@ No server, no build step, no dependencies.
 `node tests/headless.js` drives the game in headless Chromium via Playwright and prints ok/FAIL per check
 (exit code 1 on any failure). Screenshots land in `tests/out/` (gitignored). Playwright is the only
 requirement and is not vendored; it is test-only, the game itself has no dependencies.
+Each test section starts from `fresh()`, which clears localStorage. Persistence checks use `reload()`, which keeps it.
+
+## Branches
+- Day-to-day work happens on **`dev`**. Commit there and push `dev` (`git push origin dev`).
+- **`main` only changes by a deliberate merge** of `dev`, done when the user asks for it. Never commit directly to `main` or push it otherwise, because every push to `main` redeploys the live site.
+- The cloud environment's stop hook asks for the *checked-out* branch to be pushed, so staying on `dev` makes it push `dev`. If a session starts on `main`, switch to `dev` (`git switch dev`) before changing anything.
 
 ## Hosting
 - The repo is deployed as-is by Cloudflare Pages on every push to `main` (no build command, output directory is the repo root). Live at https://chompers.realmarras.com/.
@@ -29,19 +35,26 @@ requirement and is not vendored; it is test-only, the game itself has no depende
 
 ## Conventions
 - **Single file:** everything lives in `chompers.html` — inline CSS and JS, no external assets or libraries.
-- **Four clearly commented sections, in this order:**
+- **Six clearly commented sections, in this order:**
   1. `CONFIG / DATA` — modes, enemy types, the `CAMPAIGN`, escalation, number ranges, lives, grid size, scoring, timings, palette. All tunables live here and are meant to be hand-edited.
   2. `ENGINE` — game state and rules. No DOM, no canvas, no keyboard code. Driven only by `Engine.handle(action)` and `Engine.update(dtMs)`.
   3. `RENDER` — draws `Engine.state` to a canvas. Reads state, never mutates it.
-  4. `INPUT` — maps physical input to abstract actions (`up`, `down`, `left`, `right`, `eat`, `pause`, `confirm`, `blur`) and calls `Engine.handle`. A future touch layer just emits the same actions; the engine does not change.
+  4. `SOUND` — a tiny WebAudio synth (oscillators and a noise buffer, no sample files). `Sound.play(name)` for `move`, `correct`, `wrong`, `death`, `clear`, `spawn`, `safe`, `menu`.
+  5. `STORAGE` — one versioned localStorage entry (`CONFIG.storage.key`, currently `chompers.v1`) holding `Engine.saveData()`: high scores, mute, last initials. Bad or foreign-version data loads as nothing saved.
+  6. `INPUT` — maps physical input to abstract actions (`up`, `down`, `left`, `right`, `eat`, `pause`, `confirm`, `blur`, `mute`, `any` for unmapped keys) and calls `Engine.handle`. Key and pointer handlers also call `Sound.unlock()` (browsers need a gesture before audio). A future touch layer just emits the same actions; the engine does not change.
+  - After the sections, the boot code loads the save, then runs the frame loop: `Loop.step(dt)` drains engine events into SOUND, STORAGE and hit-stop, then calls `Engine.update`.
 - **Rendering:** canvas at a fixed logical resolution of 320×200, scaled up by an integer factor to fit the window (`image-rendering: pixelated`). Text uses a built-in 5×7 bitmap font so it stays crisp.
-- **Controls:** arrows / WASD move, Space eats (also starts / continues), Esc pauses. On the title screen Up/Down choose Campaign or a practice mode (`CONFIG.menu`). Window blur auto-pauses.
+- **Controls:** arrows / WASD move, Space eats (also starts / continues), Esc pauses, M toggles sound (saved). On the title screen Up/Down choose Campaign or a practice mode (`CONFIG.menu`). For high-score initials, Up/Down change the letter, Left/Right move between letters and Space saves. Window blur auto-pauses.
 - **Modes** are entries in `MODES` (in CONFIG) with four required functions: `title` (header), `isCorrect`, `makeValue` (generator; may return `null`, the engine retries), `explain` (wrong-eat message). Optional: `name` (menus), `setup(p, rnd)` (turns stage params into concrete params once per level, e.g. picking N from `ns`) and `widen(p, f)` (ranges scaled by f for escalation). Current modes: `multiples`, `factors`, `primes`, `equals` (variants `eq` / `lt` / `gt`). Adding a mode needs a `MODES` entry plus `CAMPAIGN` stages (and a `CONFIG.menu` id for practice), with no engine changes. Wanderer rewrites call the mode's own `makeValue`.
 - **Cell values** are numbers or short expression strings (`"3+9"`, `"4×3"`, `"15−3"`, `"24÷2"`, using the Unicode `−`, `×`, `÷`). Uniqueness is by displayed text. Cell text is at most `board.maxChars` (6) characters. Text of up to 3 characters uses the normal 5×7 font; anything longer uses the condensed 3×7 digit/operator font, for both the big centred label and the small label under the player or a Grump. `MathUtil` holds the shared helpers (`isPrime`, `factors`, `evalExpr`).
 - **Enemies ("Grumps")** are entries in `ENEMY_TYPES` (in CONFIG) with `name`, `color`, `tickMs`, `altersNumbers`, `move(e, w, t)` plus any type-specific tunables. `move` returns a direction and only sees a small `world` object (grid size, player position, `canEnter`, rng), so new types need no engine changes. Per-stage enemy settings (`enemies: { count, types, spawnDelay, tickMult }`, `safeCell`) live in the `CAMPAIGN` stages; global caps and timings live in `CONFIG.enemies`, `CONFIG.safeCell`, `CONFIG.timing`.
 - **Time** only advances in `Engine.update`, and only the `playing` screen ticks enemies, spawns and the safe cell, so pause freezes everything. Lockouts (wrong eat, death) share one `lockT` / `lockKind` mechanism.
+- **Engine events:** the engine never touches audio or storage. It queues event names (`move`, `correct`, `wrong`, `death`, `clear`, `spawn`, `safe`, `menu`, `mute`, `save`) in `state.events`, and the boot loop drains them with `Engine.drainEvents()`. A new sound means a new `emit(...)` in the engine plus an `SFX` entry with the same name.
+- **Screens:** `title` → `playing` ⇄ `paused` / `levelclear` → `entername` (only for a top-5 score) → `gameover` → `title`. After `CONFIG.attract.idleMs` idle on the title comes `attract`, a demo board with Grumps and no player, kept entirely in `state.attract`. Any key returns to the title, and the demo never changes game state, scores or storage.
+- **High scores:** `state.hiscores[track]` holds the top `CONFIG.hiscores.perTrack` (5) entries `{ name, score, stage }` for each `CONFIG.menu` track. The pure helpers are in `Engine.Hiscores` (`qualifies`, `insert`, `sanitize`). A score must be above 0 and beat, not tie, the 5th entry. Ties go below existing equal scores.
+- **Feel** (`CONFIG.feel`): death screen flash (`deathFlash*`, drawn by RENDER from the death flash timer) and hit-stop on a correct eat (`hitStop`, `hitStopFrames`, applied by the boot loop). Both can be switched off.
 - Boards never show duplicate numbers; a level's range must hold well over `cols*rows` values (the engine throws if it can't fill a board).
-- For quick debugging, `window.Chompers` exposes `{ CONFIG, MODES, ENEMY_TYPES, Engine }` in the browser console. `Engine.debug` has test hooks (`gotoLevel`, `spawn`, `placePlayer`, `setSafe`); the game never calls them.
+- For quick debugging, `window.Chompers` exposes `{ CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Render, Input, Sound, Storage, Loop }` in the browser console. `Engine.debug` has test hooks (`gotoLevel`, `spawn`, `placePlayer`, `setSafe`); the game never calls them.
 
 ## Campaign, practice and escalation
 - **`CAMPAIGN`** (in CONFIG) is an array of stages, one per level, played in order: `{ mode, params, enemies, safeCell }`. Modes rotate, and each mode's first stage is its gentlest. There are currently 22 stages.

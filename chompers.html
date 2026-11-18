@@ -67,6 +67,41 @@ const CONFIG = {
     blinkBefore: 1500, // marker blinks during its last this-many ms
   },
 
+  sound: {
+    volume: 0.35,          // master volume, 0..1
+    mutedByDefault: false, // first visit only; after that the saved M toggle wins
+  },
+
+  feel: {
+    deathFlash: true,      // whole-screen flash when a Grump catches you
+    deathFlashMs: 140,
+    deathFlashColor: '#ffffff',
+    deathFlashAlpha: 0.55, // opacity at the start of the flash (fades to 0)
+    hitStop: true,         // freeze the game briefly on a correct eat
+    hitStopFrames: 1,      // how many animation frames to hold
+  },
+
+  attract: {
+    enabled: true,
+    idleMs: 20000,         // idle time on the title screen before the demo starts
+    durationMs: 25000,     // demo length before it returns to the title by itself
+    grumps: 4,
+    types: ['wanderer', 'wanderer', 'stalker'],
+    tickMult: 0.8,         // demo Grump speed
+    retargetMs: 2500,      // Stalkers chase an invisible point that moves this often
+  },
+
+  hiscores: {
+    perTrack: 5,           // table size for each of CONFIG.menu's tracks
+    alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    defaultInitials: 'AAA',
+  },
+
+  storage: {               // one localStorage entry holds high scores, mute and last initials
+    key: 'chompers.v1',    // bump the version (key and number) if the saved shape ever changes
+    version: 1,
+  },
+
   // Past the last stage of a track the game does NOT loop. With k = stage - trackLength
   // (1, 2, 3, ...), modes keep cycling through the track's stages in order, and
   // difficulty comes from this formula ("last" = the track's final stage):
@@ -377,7 +412,10 @@ const CAMPAIGN = [
  * 2. ENGINE
  *    Pure game state + rules. No DOM / canvas / keyboard here.
  *    Driven by Engine.handle(action) and Engine.update(dtMs).
- *    Actions: up down left right eat pause confirm blur
+ *    Actions: up down left right eat pause confirm blur mute any
+ *    It never touches audio or storage: it queues events ('move', 'correct',
+ *    'wrong', 'death', 'clear', 'spawn', 'safe', 'menu', 'mute', 'save') that
+ *    the boot loop drains (Engine.drainEvents) for SOUND, STORAGE and hit-stop.
  * ===================================================================== */
 
 const Engine = (() => {
@@ -386,8 +424,38 @@ const Engine = (() => {
   const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
   const NO_ENEMIES = { count: 0, types: [], spawnDelay: 0, tickMult: 1 };
 
+  // ---------- high-score tables (pure) ----------
+  // A table is an array of { name, score, stage }, best first, at most `cap` long.
+  const Hiscores = {
+    qualifies: (list, score, cap) => score > 0 && (list.length < cap || score > list[list.length - 1].score),
+    // Insert below any equal scores (older entries keep their place). Returns
+    // { list, rank } with a 0-based rank, or rank -1 if it fell off the table.
+    insert(list, entry, cap) {
+      const out = list.slice();
+      let i = out.findIndex(e => entry.score > e.score);
+      if (i < 0) i = out.length;
+      out.splice(i, 0, entry);
+      return { list: out.slice(0, cap), rank: i < cap ? i : -1 };
+    },
+    validName: n => typeof n === 'string' && n.length === 3 && [...n].every(ch => CONFIG.hiscores.alphabet.includes(ch)),
+    // Whatever came out of storage -> { [track]: table } for exactly `tracks`.
+    sanitize(raw, tracks, cap) {
+      const out = {};
+      for (const t of tracks) {
+        const list = raw && Array.isArray(raw[t]) ? raw[t] : [];
+        out[t] = list
+          .filter(e => e && Hiscores.validName(e.name) && Number.isInteger(e.score) && e.score > 0
+                       && Number.isInteger(e.stage) && e.stage >= 1)
+          .map(e => ({ name: e.name, score: e.score, stage: e.stage }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, cap);
+      }
+      return out;
+    },
+  };
+
   const state = {
-    screen: 'title',      // title | playing | paused | levelclear | gameover
+    screen: 'title',      // title | attract | playing | paused | levelclear | entername | gameover
     menuIndex: 0,         // selected title-menu entry (index into CONFIG.menu)
     track: 'campaign',    // 'campaign' or a mode id (practice)
     stage: null,          // stageFor(track, level): resolved stage settings
@@ -413,7 +481,27 @@ const Engine = (() => {
     safeDuration: 0,      // how long a safe cell lasts on this level (ms)
     safe: null,           // { col, row, t, dur } while a safe cell is up
     safeT: 0,             // ms until the next safe cell appears (while none is up)
+    // --- polish: stats, scores, settings, attract ---
+    levelStats: { correct: 0, wrong: 0, ms: 0 }, // this stage, for the stage-clear banner
+    events: [],           // queued event names, drained by the boot loop
+    hiscores: Hiscores.sanitize(null, CONFIG.menu, CONFIG.hiscores.perTrack), // { [track]: table }
+    initials: CONFIG.hiscores.defaultInitials, // last name entered (pre-fills the next entry)
+    entry: null,          // { initials:[a,b,c], pos } during name entry
+    newEntry: null,       // { track, rank } of the entry just made (highlighted on game over)
+    muted: !!CONFIG.sound.mutedByDefault,
+    idleT: 0,             // ms idle on the title screen
+    attract: null,        // demo board while screen === 'attract' (never touches the fields above)
   };
+
+  function emit(type) {
+    state.events.push(type);
+    if (state.events.length > 64) state.events.shift();
+  }
+  function drainEvents() {
+    const ev = state.events;
+    state.events = [];
+    return ev;
+  }
 
   const mode = () => MODES[state.modeId];
   const idx = (c, r) => r * CONFIG.grid.cols + c;
@@ -466,10 +554,9 @@ const Engine = (() => {
   // ---------- numbers ----------
   // A value not in `used` whose correctness == want, or null if none turns up.
   // (Small ranges, e.g. primes to 30 on a 30-cell board, need many tries for the last cells.)
-  function uniqueValue(want, used) {
-    const m = mode();
+  function uniqueValue(m, p, want, used) {
     for (let tries = 0; tries < 2000; tries++) {
-      const v = m.makeValue(state.params, want, rnd);
+      const v = m.makeValue(p, want, rnd);
       if (v !== null && v !== undefined && !used.has(v)) return v;
     }
     return null;
@@ -480,7 +567,8 @@ const Engine = (() => {
     return state.cells.filter(c => !c.eaten && m.isCorrect(c.value, p)).length;
   }
 
-  function buildBoard() {
+  // A fresh board's cells for mode m with params p (label is for error messages).
+  function makeBoard(m, p, label) {
     const { cols, rows } = CONFIG.grid;
     const total = cols * rows;
     const want = [];
@@ -495,18 +583,24 @@ const Engine = (() => {
     const exhausted = { true: false, false: false }; // stop asking for a kind the range has run out of
     const draw = w => {
       if (exhausted[w]) return null;
-      const v = uniqueValue(w, used);
+      const v = uniqueValue(m, p, w, used);
       if (v === null) exhausted[w] = true;
       return v;
     };
-    state.cells = want.map(w => {
+    return want.map(w => {
       const v = draw(w) ?? draw(!w);
-      if (v === null) throw new Error(`${trackLabel(state.track)} stage ${state.level}: number range too small for ${total} unique cells`);
+      if (v === null) throw new Error(`${label}: number range too small for ${total} unique cells`);
       used.add(v);
       return { value: v, eaten: false, fxT: 0 };
     });
+  }
+
+  function buildBoard() {
+    const label = `${trackLabel(state.track)} stage ${state.level}`;
+    state.cells = makeBoard(mode(), state.params, label);
     state.remaining = countRemaining();
-    if (state.remaining < minC) console.warn(`${trackLabel(state.track)} stage ${state.level}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this stage's range`);
+    const minC = Math.min(CONFIG.board.minCorrect, state.cells.length);
+    if (state.remaining < minC) console.warn(`${label}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this stage's range`);
   }
 
   // A number-altering Grump stepped on cell i: give it a new number that is
@@ -521,8 +615,8 @@ const Engine = (() => {
     const used = new Set();
     state.cells.forEach((c, j) => { if (!c.eaten || j === i) used.add(c.value); });
     const want = mustBeCorrect || Math.random() < CONFIG.board.correctRatio;
-    let v = uniqueValue(want, used);
-    if (v === null && !mustBeCorrect) v = uniqueValue(!want, used);
+    let v = uniqueValue(m, p, want, used);
+    if (v === null && !mustBeCorrect) v = uniqueValue(m, p, !want, used);
     if (v === null) return; // range exhausted: leave the cell as it is
     cell.value = v;
     cell.eaten = false;
@@ -554,6 +648,7 @@ const Engine = (() => {
     state.safeDuration = st.safeDuration;
     state.safe = null;
     state.safeT = CONFIG.safeCell.firstDelay;
+    state.levelStats = { correct: 0, wrong: 0, ms: 0 };
     state.screen = 'playing';
   }
 
@@ -562,15 +657,17 @@ const Engine = (() => {
     state.level = 1;
     state.score = 0;
     state.lives = CONFIG.startLives;
+    state.newEntry = null;
     startLevel();
   }
 
   // ---------- player ----------
   function move(dir) {
     const [dx, dy] = DIRS[dir];
-    const p = state.player;
+    const p = state.player, before = idx(p.col, p.row);
     p.col = Math.max(0, Math.min(CONFIG.grid.cols - 1, p.col + dx));
     p.row = Math.max(0, Math.min(CONFIG.grid.rows - 1, p.row + dy));
+    if (idx(p.col, p.row) !== before) emit('move');
     checkCollision();
   }
 
@@ -583,15 +680,20 @@ const Engine = (() => {
       const pts = CONFIG.scoring.correct * state.level;
       state.score += pts;
       state.remaining--;
+      state.levelStats.correct++;
       state.flash = { kind: 'good', t: CONFIG.timing.goodFlash, dur: CONFIG.timing.goodFlash, cell: i, msg: '+' + pts };
+      emit('correct');
       if (state.remaining <= 0) {
         state.lastBonus = CONFIG.scoring.levelBonus * state.level;
         state.score += state.lastBonus;
         state.screen = 'levelclear';
         state.screenT = CONFIG.timing.levelClear;
+        emit('clear');
       }
     } else {
       state.lives--;
+      state.levelStats.wrong++;
+      emit('wrong');
       state.flash = { kind: 'bad', t: CONFIG.timing.wrongLock, dur: CONFIG.timing.wrongLock, cell: i,
                       msg: mode().explain(cell.value, state.params) };
       state.lockT = CONFIG.timing.wrongLock;
@@ -617,19 +719,103 @@ const Engine = (() => {
     state.player.chompT = 0;
     state.flash = { kind: 'dead', t, dur: t, cell: idx(state.player.col, state.player.row),
                     msg: `${typeOf(e).name} got you!` };
+    emit('death');
   }
 
   function endLock() {
     const kind = state.lockKind;
     state.lockT = 0;
     state.lockKind = null;
-    if (state.lives <= 0) { state.screen = 'gameover'; state.screenT = CONFIG.timing.gameOverGuard; return; }
+    if (state.lives <= 0) { finishGame(); return; }
     if (kind === 'death') {
       state.enemies = [];
       centrePlayer();
       state.spawnT = state.enemyCfg.spawnDelay;
     } else {
       checkCollision(); // an unfrozen Grump may have walked in during the wrong-eat lock
+    }
+  }
+
+  // ---------- game over + high scores ----------
+  function finishGame() {
+    const list = state.hiscores[state.track] || [];
+    state.newEntry = null;
+    if (Hiscores.qualifies(list, state.score, CONFIG.hiscores.perTrack)) {
+      state.entry = { initials: [...state.initials], pos: 0 };
+      state.screen = 'entername';
+    } else {
+      state.screen = 'gameover';
+    }
+    state.screenT = CONFIG.timing.gameOverGuard;
+  }
+
+  // Up/Down change the letter under the cursor, Left/Right move it, Space/Enter saves.
+  function nameEntry(action, go) {
+    const e = state.entry, A = CONFIG.hiscores.alphabet;
+    if (action === 'up' || action === 'down') {
+      const i = Math.max(0, A.indexOf(e.initials[e.pos]));
+      e.initials[e.pos] = A[(i + (action === 'up' ? 1 : A.length - 1)) % A.length];
+      emit('menu');
+    } else if (action === 'left' || action === 'right') {
+      e.pos = Math.max(0, Math.min(e.initials.length - 1, e.pos + (action === 'right' ? 1 : -1)));
+      emit('menu');
+    } else if (go) {
+      const name = e.initials.join('');
+      const res = Hiscores.insert(state.hiscores[state.track] || [], { name, score: state.score, stage: state.level },
+                                  CONFIG.hiscores.perTrack);
+      state.hiscores = { ...state.hiscores, [state.track]: res.list };
+      state.initials = name;
+      state.newEntry = { track: state.track, rank: res.rank };
+      state.entry = null;
+      state.screen = 'gameover';
+      state.screenT = CONFIG.timing.gameOverGuard;
+      emit('save');
+    }
+  }
+
+  // ---------- attract demo (title idle) ----------
+  // Runs on its own board and Grumps in state.attract; the game fields are untouched.
+  const randomCell = () => ({ col: rnd(0, CONFIG.grid.cols - 1), row: rnd(0, CONFIG.grid.rows - 1) });
+  function startAttract() {
+    const A = CONFIG.attract, { cols, rows } = CONFIG.grid;
+    const level = rnd(1, CAMPAIGN.length);
+    const st = stageFor('campaign', level), m = MODES[st.modeId];
+    const params = m.setup ? m.setup(st.params, rnd) : st.params;
+    const enemies = [];
+    for (let i = 0; i < A.grumps; i++) {
+      const onCol = Math.random() < 0.5;
+      const col = onCol ? MathUtil.pick([0, cols - 1], rnd) : rnd(0, cols - 1);
+      const row = onCol ? rnd(0, rows - 1) : MathUtil.pick([0, rows - 1], rnd);
+      const type = MathUtil.pick(A.types, rnd);
+      enemies.push({ id: -1 - i, type, col, row, dir: inwardDir(col, row),
+                     tickT: rnd(200, ENEMY_TYPES[type].tickMs), animT: rnd(0, 500) });
+    }
+    state.attract = { modeId: st.modeId, params, level, cells: makeBoard(m, params, 'attract demo'),
+                      enemies, target: randomCell(), targetT: A.retargetMs, t: A.durationMs };
+    state.screen = 'attract';
+  }
+  function stopAttract() {
+    state.attract = null;
+    state.screen = 'title';
+    state.idleT = 0;
+  }
+  function updateAttract(dt) {
+    const a = state.attract, A = CONFIG.attract;
+    a.t -= dt;
+    if (a.t <= 0) { stopAttract(); return; }
+    a.targetT -= dt;
+    if (a.targetT <= 0) { a.target = randomCell(); a.targetT = A.retargetMs; }
+    // Stalkers chase a roaming invisible target; nobody rewrites numbers in the demo.
+    const w = { cols: CONFIG.grid.cols, rows: CONFIG.grid.rows, player: { ...a.target },
+                dirs: DIR_LIST.map(d => d.slice()), canEnter: inGrid, random: Math.random, rnd };
+    for (const e of a.enemies) {
+      e.animT += dt;
+      e.tickT -= dt;
+      if (e.tickT > 0) continue;
+      const t = ENEMY_TYPES[e.type];
+      e.tickT += t.tickMs * A.tickMult;
+      const d = t.move(e, w, t);
+      if (d && w.canEnter(e.col + d[0], e.row + d[1])) { e.col += d[0]; e.row += d[1]; e.dir = [d[0], d[1]]; }
     }
   }
 
@@ -661,6 +847,7 @@ const Engine = (() => {
     const [c, r] = cells[rnd(0, cells.length - 1)];
     const types = state.enemyCfg.types;
     addEnemy(types[rnd(0, types.length - 1)], c, r);
+    emit('spawn');
     return true;
   }
 
@@ -711,6 +898,7 @@ const Engine = (() => {
     if (!free.length) return; // retry next frame
     const [c, r] = free[rnd(0, free.length - 1)];
     state.safe = { col: c, row: r, t: state.safeDuration, dur: state.safeDuration };
+    emit('safe');
   }
 
   function updateSafe(dt) {
@@ -728,15 +916,22 @@ const Engine = (() => {
   function handle(action) {
     const s = state;
     if (action === 'blur') { if (s.screen === 'playing') s.screen = 'paused'; return; }
+    if (s.screen === 'attract') { stopAttract(); return; } // any key: back to the title, key consumed
+    if (s.screen === 'title') s.idleT = 0;
+    if (action === 'mute') { s.muted = !s.muted; emit('mute'); return; }
     const go = action === 'eat' || action === 'confirm';
     switch (s.screen) {
       case 'title':
         if (action === 'up' || action === 'down') {
           const n = CONFIG.menu.length;
           s.menuIndex = (s.menuIndex + (action === 'down' ? 1 : n - 1)) % n;
+          emit('menu');
         } else if (go) newGame(CONFIG.menu[s.menuIndex]);
         break;
-      case 'gameover': if (go && s.screenT <= 0) s.screen = 'title'; break;
+      case 'entername': if (s.screenT <= 0) nameEntry(action, go); break;
+      case 'gameover':
+        if (go && s.screenT <= 0) { s.screen = 'title'; s.idleT = 0; s.newEntry = null; }
+        break;
       case 'paused':   if (action === 'pause' || go) s.screen = 'playing'; break;
       case 'levelclear': break;
       case 'playing':
@@ -761,6 +956,7 @@ const Engine = (() => {
     const s = state;
     if (s.screen === 'playing') {
       tickCommon(dt);
+      s.levelStats.ms += dt;
       const frozen = s.lockT > 0 && (s.lockKind === 'death' || CONFIG.enemies.freezeDuringWrongEat);
       if (s.lockT > 0) {
         s.lockT -= dt;
@@ -775,10 +971,24 @@ const Engine = (() => {
       tickCommon(dt);
       s.screenT -= dt;
       if (s.screenT <= 0) { s.level++; startLevel(); }
-    } else if (s.screen === 'gameover') {
+    } else if (s.screen === 'gameover' || s.screen === 'entername') {
       if (s.screenT > 0) s.screenT -= dt;
+    } else if (s.screen === 'title') {
+      s.idleT += dt;
+      if (CONFIG.attract.enabled && s.idleT >= CONFIG.attract.idleMs) startAttract();
+    } else if (s.screen === 'attract') {
+      updateAttract(dt);
     }
   }
+
+  // ---------- persistence (data only; STORAGE does the I/O) ----------
+  function loadSave(data) {
+    const d = data || {};
+    state.hiscores = Hiscores.sanitize(d.hiscores, CONFIG.menu, CONFIG.hiscores.perTrack);
+    state.muted = typeof d.muted === 'boolean' ? d.muted : !!CONFIG.sound.mutedByDefault;
+    state.initials = Hiscores.validName(d.initials) ? d.initials : CONFIG.hiscores.defaultInitials;
+  }
+  const saveData = () => ({ hiscores: state.hiscores, muted: state.muted, initials: state.initials });
 
   // ---------- test / debug hooks (never called by the game itself) ----------
   const debug = {
@@ -792,7 +1002,8 @@ const Engine = (() => {
     },
   };
 
-  return { state, handle, update, mode, stageFor, trackStages, trackLabel, debug };
+  return { state, handle, update, mode, stageFor, trackStages, trackLabel, debug,
+           Hiscores, loadSave, saveData, drainEvents };
 })();
 
 
@@ -975,55 +1186,78 @@ const Render = (() => {
   }
 
   // ---- screens ----
-  function drawTitle(s, t) {
-    rect(0, 0, W, H, P.bg);
-    text(CONFIG.title, W / 2, 10, P.accent, 4, 'center');
-    text('Eat the right numbers!', W / 2, 44, P.dim, 1, 'center');
-    const bob = Math.round(Math.sin(t / 250) * 2);
-    const chomping = Math.floor(t / 400) % 3 === 0;
-    sprite(chomping ? SPR_CHOMP : SPR_IDLE, W / 2 - 14, 58 + bob, 2, creatureMap(false));
-    const gf = Math.floor(t / 300) % 2;
-    sprite(GRUMP[gf], W / 2 + 30, 60 - gf, 2, grumpMap(ENEMY_TYPES.wanderer.color));
-    sprite(GRUMP[1 - gf], W / 2 - 58, 60 - (1 - gf), 2, grumpMap(ENEMY_TYPES.stalker.color));
-    // menu
-    CONFIG.menu.forEach((id, i) => {
-      const y = 94 + i * 12, sel = i === s.menuIndex;
-      if (sel) {
-        rect(W / 2 - 100, y - 3, 200, 13, P.panel);
-        text('>', W / 2 - 96, y, P.accent);
-        text('<', W / 2 + 91, y, P.accent);
-      }
-      text(Engine.trackLabel(id), W / 2, y, sel ? P.accent : P.dim, 1, 'center');
-    });
-    if (Math.floor(t / 500) % 2 === 0) text('Up/Down choose   Space start', W / 2, 162, P.number, 1, 'center');
-    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 180, P.dim, 1, 'center');
+  const fmtTime = ms => { const sec = Math.floor(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+
+  // Top-N table centred on cx. highlight = row index to flash (or -1).
+  function drawTable(list, cx, y, rowH, highlight, t) {
+    for (let i = 0; i < CONFIG.hiscores.perTrack; i++) {
+      const e = list[i], yy = y + i * rowH;
+      const line = e ? `${i + 1} ${e.name} ${String(e.score).padStart(5, ' ')} S${e.stage}`
+                     : `${i + 1} --- ${'-----'} ${'   '}`;
+      const hot = i === highlight;
+      if (hot) rect(cx - 52, yy - 2, 104, rowH, P.panel);
+      const col = hot ? (Math.floor(t / 250) % 2 ? P.accent : P.number) : e ? P.number : P.dim;
+      text(line, cx - 45, yy, col);
+    }
   }
 
-  function drawBoard(s, t) {
+  function drawTitle(s, t) {
     rect(0, 0, W, H, P.bg);
-    const m = Engine.mode();
+    text(CONFIG.title, W / 2, 8, P.accent, 4, 'center');
+    text('Eat the right numbers!', W / 2, 40, P.dim, 1, 'center');
+
+    // parade: the Chomper chomps across the screen with two Grumps in pursuit
+    const span = W + 56, ground = 79; // each sprite is off-screen for only ~7% of its loop
+    const at = offset => Math.round(((t * 0.045 + offset) % span + span) % span) - 28;
+    rect(0, ground + 1, W, 1, P.panel);
+    const chomp = Math.floor(t / 180) % 2 === 0, cs = chomp ? SPR_CHOMP : SPR_IDLE;
+    sprite(cs, at(0), ground - cs.length * 2 + 1 - (chomp ? 0 : 1), 2, creatureMap(false));
+    [['wanderer', -46], ['stalker', -84]].forEach(([type, off], i) => {
+      const f = Math.floor(t / 220 + i) % 2;
+      sprite(GRUMP[f], at(off), ground - GRUMP[f].length * 2 + 1 - f, 2, grumpMap(ENEMY_TYPES[type].color));
+    });
+
+    // menu (left) + high scores for the selected track (right)
+    CONFIG.menu.forEach((id, i) => {
+      const y = 90 + i * 12, sel = i === s.menuIndex;
+      if (sel) { rect(4, y - 3, 182, 13, P.panel); text('>', 8, y, P.accent); }
+      text(Engine.trackLabel(id), 16, y, sel ? P.accent : P.dim);
+    });
+    rect(190, 88, 1, 58, P.panel);
+    text('High scores', 254, 90, P.dim, 1, 'center');
+    drawTable(s.hiscores[CONFIG.menu[s.menuIndex]] || [], 254, 102, 10, -1, t);
+
+    if (Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 158, P.accent, 1, 'center');
+    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 172, P.dim, 1, 'center');
+    text(`Up/Down choose   M sound ${s.muted ? 'off' : 'on'}`, W / 2, 184, P.dim, 1, 'center');
+  }
+
+  // v: the game state, or the attract demo's view of a board (demo: true, no player)
+  function drawBoard(v, t) {
+    rect(0, 0, W, H, P.bg);
+    const m = MODES[v.modeId];
 
     // header
     rect(0, 0, W, HEADER_H, P.panel);
-    text(m.title(s.params), MARGIN, 6, P.accent);
-    text('Stage ' + s.level, W - MARGIN, 6, P.number, 1, 'right');
+    text(m.title(v.params), MARGIN, 6, P.accent);
+    text(v.demo ? 'Demo' : 'Stage ' + v.level, W - MARGIN, 6, P.number, 1, 'right');
 
     // grid
-    const bad = s.flash && (s.flash.kind === 'bad' || s.flash.kind === 'dead');
-    const occupied = new Set(s.enemies.map(e => e.row * CONFIG.grid.cols + e.col));
-    occupied.add(s.player.row * CONFIG.grid.cols + s.player.col);
-    const safeVisible = s.safe && (s.safe.t > CONFIG.safeCell.blinkBefore || Math.floor(s.safe.t / 150) % 2 === 0);
+    const bad = v.flash && (v.flash.kind === 'bad' || v.flash.kind === 'dead');
+    const occupied = new Set(v.enemies.map(e => e.row * CONFIG.grid.cols + e.col));
+    if (v.player) occupied.add(v.player.row * CONFIG.grid.cols + v.player.col);
+    const safeVisible = v.safe && (v.safe.t > CONFIG.safeCell.blinkBefore || Math.floor(v.safe.t / 150) % 2 === 0);
     const smallLabels = []; // drawn after the sprites so long expressions stay readable
     for (let r = 0; r < CONFIG.grid.rows; r++) {
       for (let c = 0; c < CONFIG.grid.cols; c++) {
-        const i = r * CONFIG.grid.cols + c, cell = s.cells[i];
+        const i = r * CONFIG.grid.cols + c, cell = v.cells[i];
         const x = gridX + c * cellW, y = gridY + r * cellH;
-        const flashing = s.flash && s.flash.cell === i;
-        const safeHere = safeVisible && s.safe.col === c && s.safe.row === r;
+        const flashing = v.flash && v.flash.cell === i;
+        const safeHere = safeVisible && v.safe.col === c && v.safe.row === r;
         let fill = cell.eaten ? P.cellEaten : P.cell;
         if (safeHere) fill = P.safeFill;
-        if (flashing && bad && Math.floor(s.flash.t / 120) % 2 === 0) fill = P.bad;
-        if (flashing && s.flash.kind === 'good') fill = P.good;
+        if (flashing && bad && Math.floor(v.flash.t / 120) % 2 === 0) fill = P.bad;
+        if (flashing && v.flash.kind === 'good') fill = P.good;
         rect(x + 1, y + 1, cellW - 2, cellH - 2, fill);
         frame(x, y, cellW, cellH, P.cellEdge);
         if (safeHere) {
@@ -1041,27 +1275,29 @@ const Render = (() => {
 
     // enemies (a Grump sharing the player's cell shifts left so both show)
     const sw = 14 * 2;
-    for (const e of s.enemies) {
+    for (const e of v.enemies) {
       const ex = gridX + e.col * cellW, ey = gridY + e.row * cellH;
       const f = Math.floor(e.animT / 250) % 2, spr = GRUMP[f];
-      const withPlayer = e.col === s.player.col && e.row === s.player.row;
+      const withPlayer = v.player && e.col === v.player.col && e.row === v.player.row;
       const x = withPlayer ? ex + 3 : ex + cellW - sw - 3;
       sprite(spr, x, ey + cellH - spr.length * 2 - 1 - f, 2, grumpMap(ENEMY_TYPES[e.type].color));
     }
 
     // player
-    const px = gridX + s.player.col * cellW, py = gridY + s.player.row * cellH;
-    const dying = s.flash && s.flash.kind === 'dead';
-    if (dying) {
-      // shake with X-eyes, then blink out while floating up
-      const k = 1 - s.flash.t / s.flash.dur;
-      const shake = k < 0.6 ? (Math.floor(s.flash.t / 60) % 2 ? 1 : -1) : 0;
-      const lift = k < 0.6 ? 0 : Math.round((k - 0.6) * 20);
-      const show = k < 0.6 || Math.floor(s.flash.t / 80) % 2 === 0;
-      if (show) sprite(SPR_DEAD, px + cellW - sw - 3 + shake, py + cellH - SPR_DEAD.length * 2 - 1 - lift, 2, creatureMap(true));
-    } else {
-      const spr = s.player.chompT > 0 ? SPR_CHOMP : SPR_IDLE;
-      sprite(spr, px + cellW - sw - 3, py + cellH - spr.length * 2 - 1, 2, creatureMap(bad));
+    const dying = v.flash && v.flash.kind === 'dead';
+    if (v.player) {
+      const px = gridX + v.player.col * cellW, py = gridY + v.player.row * cellH;
+      if (dying) {
+        // shake with X-eyes, then blink out while floating up
+        const k = 1 - v.flash.t / v.flash.dur;
+        const shake = k < 0.6 ? (Math.floor(v.flash.t / 60) % 2 ? 1 : -1) : 0;
+        const lift = k < 0.6 ? 0 : Math.round((k - 0.6) * 20);
+        const show = k < 0.6 || Math.floor(v.flash.t / 80) % 2 === 0;
+        if (show) sprite(SPR_DEAD, px + cellW - sw - 3 + shake, py + cellH - SPR_DEAD.length * 2 - 1 - lift, 2, creatureMap(true));
+      } else {
+        const spr = v.player.chompT > 0 ? SPR_CHOMP : SPR_IDLE;
+        sprite(spr, px + cellW - sw - 3, py + cellH - spr.length * 2 - 1, 2, creatureMap(bad));
+      }
     }
 
     // numbers under the player / Grumps
@@ -1071,51 +1307,103 @@ const Render = (() => {
     }
 
     // "+points" pop
-    if (s.flash && s.flash.kind === 'good') {
-      const k = 1 - s.flash.t / s.flash.dur;
-      const fc = s.flash.cell % CONFIG.grid.cols, fr = Math.floor(s.flash.cell / CONFIG.grid.cols);
-      text(s.flash.msg, gridX + fc * cellW + cellW / 2, gridY + fr * cellH - Math.round(k * 10), P.good, 1, 'center');
+    if (v.flash && v.flash.kind === 'good') {
+      const k = 1 - v.flash.t / v.flash.dur;
+      const fc = v.flash.cell % CONFIG.grid.cols, fr = Math.floor(v.flash.cell / CONFIG.grid.cols);
+      text(v.flash.msg, gridX + fc * cellW + cellW / 2, gridY + fr * cellH - Math.round(k * 10), P.good, 1, 'center');
     }
 
     // HUD
     const hudY = H - HUD_H;
     rect(0, hudY, W, HUD_H, P.panel);
-    text('Score ' + String(s.score).padStart(5, '0'), MARGIN, hudY + 8, P.number);
-    for (let i = 0; i < CONFIG.startLives; i++) {
-      const x = W - MARGIN - 14 - i * 17;
-      if (i < s.lives) sprite(SPR_IDLE, x, hudY + 5, 1, creatureMap(false));
-      else frame(x + 3, hudY + 8, 8, 6, P.cellEdge);
+    if (v.demo) {
+      if (Math.floor(t / 500) % 2 === 0) text('Press any key', W / 2, hudY + 8, P.accent, 1, 'center');
+    } else {
+      text('Score ' + String(v.score).padStart(5, '0'), MARGIN, hudY + 8, P.number);
+      if (v.muted) text('Muted', W / 2, hudY + 8, P.dim, 1, 'center');
+      for (let i = 0; i < CONFIG.startLives; i++) {
+        const x = W - MARGIN - 14 - i * 17;
+        if (i < v.lives) sprite(SPR_IDLE, x, hudY + 5, 1, creatureMap(false));
+        else frame(x + 3, hudY + 8, 8, 6, P.cellEdge);
+      }
     }
 
-    // wrong-eat message
+    // wrong-eat / death message
     if (dying) {
       // keep the death animation visible: banner goes in the half of the grid the player isn't in
-      const top = s.player.row >= Math.floor(CONFIG.grid.rows / 2);
-      banner([{ s: s.flash.msg, color: P.bad }], P.bad, gridY + cellH * (top ? 1 : CONFIG.grid.rows - 1));
-    } else if (bad) banner([{ s: s.flash.msg, color: P.bad }], P.bad);
+      const top = v.player.row >= Math.floor(CONFIG.grid.rows / 2);
+      banner([{ s: v.flash.msg, color: P.bad }], P.bad, gridY + cellH * (top ? 1 : CONFIG.grid.rows - 1));
+    } else if (bad) banner([{ s: v.flash.msg, color: P.bad }], P.bad);
+
+    // death screen flash (CONFIG.feel)
+    const F = CONFIG.feel;
+    if (dying && F.deathFlash) {
+      const age = v.flash.dur - v.flash.t;
+      if (age < F.deathFlashMs) {
+        ctx.globalAlpha = F.deathFlashAlpha * (1 - age / F.deathFlashMs);
+        rect(0, 0, W, H, F.deathFlashColor);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawNameEntry(s, t) {
+    rect(0, 0, W, H, P.bg);
+    text('New high score!', W / 2, 16, P.accent, 2, 'center');
+    text('Score ' + s.score, W / 2, 42, P.number, 1, 'center');
+    text(`${Engine.trackLabel(s.track)}  ·  Stage ${s.level}`, W / 2, 54, P.dim, 1, 'center');
+    const e = s.entry, pitch = 30, x0 = W / 2 - pitch;
+    e.initials.forEach((ch, i) => {
+      const cx = x0 + i * pitch, sel = i === e.pos;
+      frame(cx - 13, 82, 26, 36, sel ? P.accent : P.cellEdge);
+      text(ch, cx, 86, sel ? P.accent : P.number, 4, 'center');
+      if (sel && Math.floor(t / 300) % 2 === 0) {
+        for (let k = 0; k < 4; k++) {           // little arrows above and below
+          rect(cx - k, 76 - 3 + k, 2 * k + 1, 1, P.accent);
+          rect(cx - k, 124 + 3 - k, 2 * k + 1, 1, P.accent);
+        }
+      }
+    });
+    text('Up/Down letter   Left/Right move', W / 2, 152, P.dim, 1, 'center');
+    text('Space save', W / 2, 166, P.number, 1, 'center');
+  }
+
+  function drawGameOver(s, t) {
+    rect(0, 0, W, H, P.bg);
+    text('Game over', W / 2, 8, P.bad, 3, 'center');
+    text('Score ' + s.score, W / 2, 36, P.number, 2, 'center');
+    text(Engine.trackLabel(s.track), W / 2, 56, P.dim, 1, 'center');
+    text(`Stage ${s.level}: ${Engine.mode().title(s.params)}`, W / 2, 66, P.number, 1, 'center');
+    text('High scores', W / 2, 84, P.dim, 1, 'center');
+    const hl = s.newEntry && s.newEntry.track === s.track ? s.newEntry.rank : -1;
+    drawTable(s.hiscores[s.track] || [], W / 2, 96, 11, hl, t);
+    if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 172, P.accent, 1, 'center');
   }
 
   function draw(s, t) {
     switch (s.screen) {
       case 'title': drawTitle(s, t); break;
+      case 'attract': {
+        const a = s.attract;
+        drawBoard({ demo: true, modeId: a.modeId, params: a.params, level: a.level, cells: a.cells,
+                    enemies: a.enemies, player: null, safe: null, flash: null }, t);
+        break;
+      }
       case 'playing': drawBoard(s, t); break;
       case 'paused':
         drawBoard(s, t); dim();
         text('Paused', W / 2, 74, P.accent, 3, 'center');
         text('Esc or Space to resume', W / 2, 108, P.number, 1, 'center');
         break;
-      case 'levelclear':
+      case 'levelclear': {
+        const st = s.levelStats;
         drawBoard(s, t);
-        banner([{ s: 'Stage clear!', scale: 2 }, { s: 'Bonus +' + s.lastBonus, color: P.number }]);
+        banner([{ s: 'Stage clear!', scale: 2 }, { s: 'Bonus +' + s.lastBonus, color: P.number },
+                { s: `${st.correct} correct  ${st.wrong} wrong  ${fmtTime(st.ms)}`, color: P.dim }]);
         break;
-      case 'gameover':
-        rect(0, 0, W, H, P.bg);
-        text('Game over', W / 2, 40, P.bad, 3, 'center');
-        text('Score ' + s.score, W / 2, 78, P.number, 2, 'center');
-        text(Engine.trackLabel(s.track), W / 2, 104, P.dim, 1, 'center');
-        text(`Stage ${s.level}: ${Engine.mode().title(s.params)}`, W / 2, 116, P.number, 1, 'center');
-        if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 150, P.accent, 1, 'center');
-        break;
+      }
+      case 'entername': drawNameEntry(s, t); break;
+      case 'gameover': drawGameOver(s, t); break;
     }
   }
 
@@ -1134,9 +1422,118 @@ const Render = (() => {
 
 
 /* =====================================================================
- * 4. INPUT
+ * 4. SOUND
+ *    Tiny WebAudio synth: every effect is built from oscillators and a
+ *    noise buffer at play time. No sample files. Browsers only allow audio
+ *    after a user gesture, so INPUT calls Sound.unlock() on key/pointer down.
+ *    Volume and default mute live in CONFIG.sound; M toggles mute (saved).
+ * ===================================================================== */
+
+const Sound = (() => {
+  let ac = null, master = null, noiseBuf = null;
+  let muted = !!CONFIG.sound.mutedByDefault;
+  const stats = { unlocked: false, played: 0 };
+
+  function unlock() {
+    try {
+      if (!ac) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = CONFIG.sound.volume;
+        master.connect(ac.destination);
+      }
+      if (ac.state === 'suspended') ac.resume();
+      stats.unlocked = true;
+    } catch (e) { /* no audio available: stay silent */ }
+  }
+
+  // One oscillator note: wave type, start/end frequency (Hz), length (s), peak volume, delay (s).
+  function tone(type, f0, f1, dur, vol, at = 0) {
+    const t0 = ac.currentTime + at;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+
+  // A burst of band-passed noise (crunches, thuds).
+  function noise(dur, vol, freq, at = 0) {
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.5), ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t0 = ac.currentTime + at;
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = noiseBuf;
+    f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.4;
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t0); src.stop(t0 + dur + 0.03);
+  }
+
+  // The effects (all original). Names match the engine's event names.
+  const SFX = {
+    move()    { tone('square', 520, 600, 0.035, 0.08); },
+    correct() { noise(0.07, 0.5, 1900); noise(0.06, 0.35, 900, 0.045); tone('square', 330, 520, 0.08, 0.12); },
+    wrong()   { tone('sawtooth', 150, 110, 0.28, 0.22); tone('sawtooth', 157, 116, 0.28, 0.16); },
+    death()   { tone('triangle', 620, 70, 0.65, 0.3); tone('square', 310, 40, 0.65, 0.08); noise(0.35, 0.3, 300, 0.3); },
+    clear()   { [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, 0.1, 0.13, i * 0.085)); },
+    spawn()   { tone('triangle', 95, 150, 0.12, 0.25); tone('triangle', 150, 80, 0.16, 0.25, 0.12); },
+    safe()    { tone('sine', 880, 1320, 0.14, 0.18); tone('sine', 1320, 1760, 0.16, 0.14, 0.11); },
+    menu()    { tone('triangle', 1200, 1200, 0.03, 0.08); },
+  };
+
+  // Returns true if the effect actually started.
+  function play(name) {
+    const fx = SFX[name];
+    if (!fx || muted || !ac || ac.state !== 'running') return false;
+    try { fx(); stats.played++; return true; } catch (e) { return false; }
+  }
+
+  return { unlock, play, setMuted: m => { muted = !!m; }, isMuted: () => muted, names: Object.keys(SFX), stats };
+})();
+
+
+/* =====================================================================
+ * 5. STORAGE
+ *    One versioned localStorage entry (CONFIG.storage) holding the
+ *    Engine.saveData() object: high scores, mute, last initials.
+ *    Unreadable, foreign-version or missing data loads as "nothing saved".
+ * ===================================================================== */
+
+const Storage = (() => {
+  const { key, version } = CONFIG.storage;
+  function load() {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      return d && d.version === version ? d : null;
+    } catch (e) { return null; }
+  }
+  function save(data) {
+    try { window.localStorage.setItem(key, JSON.stringify({ version, ...data })); return true; }
+    catch (e) { return false; }
+  }
+  return { load, save, key };
+})();
+
+
+/* =====================================================================
+ * 6. INPUT
  *    Physical input -> abstract actions -> Engine.handle(action).
  *    A touch layer can be added later by calling emit('up'), emit('eat'), ...
+ *    Unmapped keys send 'any' (wakes the title / ends the attract demo).
+ *    Key and pointer handlers also unlock audio (browsers require a gesture).
  * ===================================================================== */
 
 const Input = (() => {
@@ -1148,20 +1545,22 @@ const Input = (() => {
     Space: 'eat',
     Enter: 'confirm', NumpadEnter: 'confirm',
     Escape: 'pause', KeyP: 'pause',
+    KeyM: 'mute',
   };
   const REPEATABLE = new Set(['up', 'down', 'left', 'right']);
 
   function emit(action) { Engine.handle(action); }
 
   window.addEventListener('keydown', e => {
+    Sound.unlock();
     const action = KEYMAP[e.code];
-    if (!action) return;
+    if (!action) { if (!e.repeat) emit('any'); return; }
     e.preventDefault();
     if (e.repeat && !REPEATABLE.has(action)) return;
     emit(action);
   });
   window.addEventListener('blur', () => emit('blur'));
-  Render.canvas.addEventListener('pointerdown', () => Render.canvas.focus());
+  Render.canvas.addEventListener('pointerdown', () => { Sound.unlock(); Render.canvas.focus(); emit('any'); });
 
   return { emit };
 })();
@@ -1169,16 +1568,40 @@ const Input = (() => {
 
 /* ---- boot + main loop ---- */
 document.title = CONFIG.title;
-window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Input };
+Engine.loadSave(Storage.load());
+Sound.setMuted(Engine.state.muted);
+window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Render, Input, Sound, Storage };
 window.addEventListener('resize', Render.fit);
 Render.fit();
 Render.canvas.focus();
+
+// Engine events -> sound, saving, hit-stop.
+let hitStop = 0;
+function handleEvents() {
+  for (const ev of Engine.drainEvents()) {
+    if (ev === 'save') { Storage.save(Engine.saveData()); continue; }
+    if (ev === 'mute') { Sound.setMuted(Engine.state.muted); Storage.save(Engine.saveData()); Sound.play('menu'); continue; }
+    Sound.play(ev);
+    if (ev === 'correct' && CONFIG.feel.hitStop) hitStop = CONFIG.feel.hitStopFrames;
+  }
+}
+
+// One frame of game time. Returns false when hit-stop held the world still.
+function step(dt) {
+  handleEvents();                       // events from key presses since the last frame
+  let ran = true;
+  if (hitStop > 0) { hitStop--; ran = false; } // CONFIG.feel.hitStop
+  else Engine.update(dt);
+  handleEvents();                       // events from this update (spawns, deaths, ...)
+  return ran;
+}
+window.Chompers.Loop = { step };
 
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(100, now - last);
   last = now;
-  Engine.update(dt);
+  step(dt);
   Render.draw(Engine.state, now);
   requestAnimationFrame(frame);
 }
