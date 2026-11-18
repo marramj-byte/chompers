@@ -28,7 +28,9 @@ const CONFIG = {
   view: { width: 320, height: 200 }, // logical canvas resolution
   grid: { cols: 6, rows: 5 },
   startLives: 3,
-  mode: 'multiples',                 // active mode id (see MODES)
+  // Title-screen menu, top to bottom: 'campaign' plays CAMPAIGN in order; a mode id
+  // is practice: only that mode's CAMPAIGN stages, then the same escalation.
+  menu: ['campaign', 'multiples', 'factors', 'primes', 'equals'],
 
   scoring: {
     correct: 5,       // points per correct eat, multiplied by level
@@ -52,7 +54,7 @@ const CONFIG = {
   },
 
   enemies: {
-    maxOnScreen: 4,             // hard cap, whatever a level asks for
+    maxOnScreen: 6,             // hard cap, whatever a stage asks for (escalation grows toward it)
     spawnMinDistance: 3,        // spawn edge cell must be at least this many steps from the player
     freezeDuringWrongEat: true, // Grumps (and their spawn / safe-cell timers) hold still during the wrong-eat lockout
     rewriteEaten: false,        // number-altering Grumps also refill already-eaten (empty) cells
@@ -65,54 +67,23 @@ const CONFIG = {
     blinkBefore: 1500, // marker blinks during its last this-many ms
   },
 
-  // Per-level parameters for each mode.
-  //   n, max      mode parameters (here: multiples of n, numbers 1..max).
-  //               Boards need unique numbers, so 1..max must hold at least
-  //               cols*rows values, with plenty of both correct and wrong ones.
-  //   enemies     { count, types, spawnDelay, tickMult }
-  //               count      Grumps on the board at once (also capped by enemies.maxOnScreen)
-  //               types      ids from ENEMY_TYPES; each spawn picks one at random (repeat an id to weight it)
-  //               spawnDelay ms before the first spawn, between spawns, and after a respawn
-  //               tickMult   multiplies every Grump's tick interval (smaller = faster)
-  //               omit enemies (or count 0) for no Grumps
-  //   safeCell    true/false: whether safe cells appear on this level
-  // Past the end of the list: n/max repeat from entry 1 (as before), but
-  // enemies/safeCell stay at the LAST entry's settings so difficulty never drops.
-  levels: {
-    multiples: [
-      { n: 2,  max: 50,  safeCell: false },
-      { n: 5,  max: 100, safeCell: false },
-      { n: 3,  max: 60,  safeCell: true,  enemies: { count: 1, types: ['wanderer'],                       spawnDelay: 4000, tickMult: 1.0  } },
-      { n: 10, max: 200, safeCell: true,  enemies: { count: 2, types: ['wanderer'],                       spawnDelay: 3500, tickMult: 1.0  } },
-      { n: 4,  max: 80,  safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'],            spawnDelay: 3500, tickMult: 1.0  } },
-      { n: 6,  max: 120, safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'],            spawnDelay: 3000, tickMult: 0.9  } },
-      { n: 9,  max: 180, safeCell: true,  enemies: { count: 3, types: ['wanderer', 'stalker'],            spawnDelay: 3000, tickMult: 0.9  } },
-      { n: 7,  max: 140, safeCell: true,  enemies: { count: 3, types: ['wanderer', 'stalker', 'stalker'], spawnDelay: 2500, tickMult: 0.85 } },
-      { n: 8,  max: 160, safeCell: true,  enemies: { count: 4, types: ['wanderer', 'stalker'],            spawnDelay: 2500, tickMult: 0.8  } },
-      { n: 12, max: 240, safeCell: true,  enemies: { count: 4, types: ['wanderer', 'stalker', 'stalker'], spawnDelay: 2000, tickMult: 0.75 } },
-    ],
-    factors: [ // ns: N is picked from this list each level; max: largest number shown
-      { ns: [12],     max: 40,  safeCell: false },
-      { ns: [18, 20], max: 50,  safeCell: false },
-      { ns: [24],     max: 60,  safeCell: true,  enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
-      { ns: [30, 36], max: 80,  safeCell: true,  enemies: { count: 2, types: ['wanderer'],            spawnDelay: 3500, tickMult: 1.0 } },
-      { ns: [48],     max: 100, safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
-      { ns: [60, 72], max: 120, safeCell: true,  enemies: { count: 3, types: ['wanderer', 'stalker'], spawnDelay: 3000, tickMult: 0.9 } },
-    ],
-    primes: [
-      { max: 30,  safeCell: false },
-      { max: 50,  safeCell: false },
-      { max: 75,  safeCell: true,  enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
-      { max: 100, safeCell: true,  enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
-    ],
-    equals: [
-      { variant: 'eq', ns: [10, 12], ops: ['+', '−'],           operand: [1, 15], safeCell: false },
-      { variant: 'lt', ns: [10, 12], ops: ['+', '−'],           operand: [1, 12], safeCell: false },
-      { variant: 'gt', ns: [15, 20], ops: ['+', '−', '×'],      operand: [1, 10], safeCell: true, enemies: { count: 1, types: ['wanderer'],            spawnDelay: 4000, tickMult: 1.0 } },
-      { variant: 'eq', ns: [12, 24], ops: ['×', '+'],           operand: [1, 12], safeCell: true, enemies: { count: 2, types: ['wanderer'],            spawnDelay: 3500, tickMult: 1.0 } },
-      { variant: 'lt', ns: [30],     ops: ['×', '÷'],           operand: [2, 10], safeCell: true, enemies: { count: 2, types: ['wanderer', 'stalker'], spawnDelay: 3500, tickMult: 1.0 } },
-      { variant: 'gt', ns: [50],     ops: ['+', '−', '×', '÷'], operand: [2, 12], safeCell: true, enemies: { count: 3, types: ['wanderer', 'stalker'], spawnDelay: 3000, tickMult: 0.9 } },
-    ],
+  // Past the last stage of a track the game does NOT loop. With k = stage - trackLength
+  // (1, 2, 3, ...), modes keep cycling through the track's stages in order, and
+  // difficulty comes from this formula ("last" = the track's final stage):
+  //   rangeScale   = min(rangeMax, 1 + rangeStep * k)      passed to the mode's widen()
+  //   Grumps       = min(enemies.maxOnScreen, last.count + floor(k / extraEnemyEvery))
+  //   tickMult     = max(min(tickFloor, last), last.tickMult * tickDecay^k)
+  //   safe cell    = on, lasting max(min(safeFloor, base), safeCell.duration * safeDecay^k) ms
+  //   Grump types  = types;  spawnDelay = last.spawnDelay (or spawnDelay below if it has none)
+  escalation: {
+    rangeStep: 0.1, rangeMax: 3,
+    extraEnemyEvery: 4,
+    tickDecay: 0.97, tickFloor: 0.45,
+    safeDecay: 0.93, safeFloor: 2500,
+    types: ['wanderer', 'stalker', 'stalker'],
+    spawnDelay: 3000,
+    maxNumber: 999,  // widened ranges never exceed this (keeps numbers to 3 characters)
+    maxOperand: 99,  // widened expression operands never exceed this
   },
 
   palette: {
@@ -175,16 +146,20 @@ const MathUtil = {
 //   explain(value, p)         -> short message shown after a wrong eat  ("wrongMessage")
 // Optional:
 //   name                      -> label for menus / game-over screen
-//   setup(p, rnd)             -> turns a level entry into concrete params once per level
-//                                (e.g. picks N from a list). Default: use the entry as-is.
+//   setup(p, rnd)             -> turns stage params into concrete params once per level
+//                                (e.g. picks N from a list). Default: use them as-is.
+//   widen(p, f)               -> stage params with ranges widened by factor f >= 1, used
+//                                past the end of a track (CONFIG.escalation). Default: unchanged.
 // Cell values may be numbers or short strings (expressions); uniqueness on a board is by
 // displayed text, and every value must fit in board.maxChars characters.
 // rnd(lo, hi) returns an integer in [lo, hi].
 const pickN = (p, rnd) => ({ ...p, n: Array.isArray(p.ns) ? MathUtil.pick(p.ns, rnd) : p.n });
+const widenMax = (p, f) => ({ ...p, max: Math.min(CONFIG.escalation.maxNumber, Math.round(p.max * f)) });
 
 const MODES = {
   multiples: {
     name: 'Multiples',
+    widen: widenMax,
     title: p => `Multiples of ${p.n}`,
     isCorrect: (v, p) => v % p.n === 0,
     makeValue(p, want, rnd) {
@@ -196,7 +171,7 @@ const MODES = {
     explain: (v, p) => `${v} is not a multiple of ${p.n}`,
   },
 
-  // Level params: ns (list of N to pick from, or n), max (largest number shown).
+  // Stage params: ns (list of N to pick from, or n), max (largest number shown).
   factors: {
     name: 'Factors',
     // Chance a WRONG cell is drawn from each near-miss pool; the rest is random fill.
@@ -205,6 +180,7 @@ const MODES = {
       primeMultiples: 0.4, // multiples of 2, 3, 5, 7 that don't divide N
     },
     setup: pickN,
+    widen: widenMax, // wider range of distractors; N itself still comes from ns
     title: p => `Factors of ${p.n}`,
     isCorrect: (v, p) => v >= 1 && p.n % v === 0,
     makeValue(p, want, rnd) {
@@ -229,11 +205,12 @@ const MODES = {
     explain: (v, p) => `${v} is not a factor of ${p.n}`,
   },
 
-  // Level params: max (numbers 1..max).
+  // Stage params: max (numbers 1..max).
   primes: {
     name: 'Primes',
     // Chance a WRONG cell is a near-miss: 1 or an odd composite (9, 15, 21, 27, 33, 39, 49, 51, 57, 91...).
     nearMissChance: 0.6,
+    widen: widenMax,
     title: () => 'Primes',
     isCorrect: v => MathUtil.isPrime(v),
     makeValue(p, want, rnd) {
@@ -258,7 +235,7 @@ const MODES = {
     },
   },
 
-  // Level params: variant ('eq' | 'lt' | 'gt'), ns (targets to pick from, or n),
+  // Stage params: variant ('eq' | 'lt' | 'gt'), ns (targets to pick from, or n),
   //   ops (any of '+', '−', '×', '÷'), operand [lo, hi].
   // Cells are expressions "a op b". Both operands come from the operand range,
   // except ÷, where the divisor and the RESULT do (so the dividend can be larger).
@@ -269,6 +246,15 @@ const MODES = {
     nearMissChance: 0.5, // chance a WRONG cell's value lands within nearMissSpread of N
     nearMissSpread: 3,
     setup: pickN,
+    // larger operands; for less/greater-than the target N scales too (equal-to keeps N)
+    widen(p, f) {
+      const scaleN = n => (p.variant === 'eq' ? n : Math.round(n * f));
+      const hi = Math.min(CONFIG.escalation.maxOperand, Math.max(p.operand[1], Math.round(p.operand[1] * f)));
+      const out = { ...p, operand: [p.operand[0], hi] };
+      if (Array.isArray(p.ns)) out.ns = p.ns.map(scaleN);
+      if (p.n !== undefined) out.n = scaleN(p.n);
+      return out;
+    },
     title(p) { return `${this.variants[p.variant]} ${p.n}`; },
     isCorrect(v, p) {
       const x = MathUtil.evalExpr(v);
@@ -347,6 +333,46 @@ const ENEMY_TYPES = {
 };
 
 
+// The campaign: one stage per level, played in order. Each stage:
+//   mode      id from MODES
+//   params    that mode's level params (see each mode above)
+//   enemies   { count, types, spawnDelay, tickMult }  (omit for no Grumps)
+//             count      Grumps on the board at once (also capped by enemies.maxOnScreen)
+//             types      ids from ENEMY_TYPES; each spawn picks one at random (repeat an id to weight it)
+//             spawnDelay ms before the first spawn, between spawns, and after a respawn
+//             tickMult   multiplies every Grump's tick interval (smaller = faster)
+//   safeCell  true/false: whether safe cells appear (they last safeCell.duration)
+// Modes rotate, and each mode's first stage is its gentlest. Practice mode plays
+// only one mode's stages from this list. Past the end: see CONFIG.escalation.
+// Every stage needs enough values for a unique 30-cell board with >= board.minCorrect
+// correct ones (the headless test checks every stage).
+const W1 = { types: ['wanderer'] }, WS = { types: ['wanderer', 'stalker'] }, WSS = { types: ['wanderer', 'stalker', 'stalker'] };
+const CAMPAIGN = [
+  /*  1 */ { mode: 'multiples', params: { n: 2, max: 50 },                                                 safeCell: false },
+  /*  2 */ { mode: 'multiples', params: { n: 5, max: 100 },                                                safeCell: false },
+  /*  3 */ { mode: 'factors',   params: { ns: [12], max: 40 },                                             safeCell: true, enemies: { count: 1, ...W1,  spawnDelay: 4000, tickMult: 1.0 } },
+  /*  4 */ { mode: 'primes',    params: { max: 30 },                                                       safeCell: true, enemies: { count: 1, ...W1,  spawnDelay: 4000, tickMult: 1.0 } },
+  /*  5 */ { mode: 'equals',    params: { variant: 'eq', ns: [10, 12], ops: ['+', '−'], operand: [1, 15] }, safeCell: true, enemies: { count: 1, ...W1,  spawnDelay: 4000, tickMult: 1.0 } },
+  /*  6 */ { mode: 'multiples', params: { n: 3, max: 60 },                                                 safeCell: true, enemies: { count: 2, ...W1,  spawnDelay: 3500, tickMult: 1.0 } },
+  /*  7 */ { mode: 'factors',   params: { ns: [24], max: 60 },                                             safeCell: true, enemies: { count: 2, ...WS,  spawnDelay: 3500, tickMult: 1.0 } },
+  /*  8 */ { mode: 'equals',    params: { variant: 'lt', ns: [10, 12], ops: ['+', '−'], operand: [1, 12] }, safeCell: true, enemies: { count: 2, ...WS,  spawnDelay: 3500, tickMult: 1.0 } },
+  /*  9 */ { mode: 'primes',    params: { max: 50 },                                                       safeCell: true, enemies: { count: 2, ...WS,  spawnDelay: 3000, tickMult: 0.95 } },
+  /* 10 */ { mode: 'multiples', params: { n: 4, max: 80 },                                                 safeCell: true, enemies: { count: 2, ...WS,  spawnDelay: 3000, tickMult: 0.9 } },
+  /* 11 */ { mode: 'equals',    params: { variant: 'gt', ns: [15, 20], ops: ['+', '−', '×'], operand: [1, 10] }, safeCell: true, enemies: { count: 3, ...WS, spawnDelay: 3000, tickMult: 0.9 } },
+  /* 12 */ { mode: 'factors',   params: { ns: [30, 36], max: 80 },                                         safeCell: true, enemies: { count: 3, ...WS,  spawnDelay: 3000, tickMult: 0.9 } },
+  /* 13 */ { mode: 'multiples', params: { n: 6, max: 120 },                                                safeCell: true, enemies: { count: 3, ...WS,  spawnDelay: 2750, tickMult: 0.9 } },
+  /* 14 */ { mode: 'primes',    params: { max: 75 },                                                       safeCell: true, enemies: { count: 3, ...WSS, spawnDelay: 2750, tickMult: 0.85 } },
+  /* 15 */ { mode: 'equals',    params: { variant: 'eq', ns: [12, 24], ops: ['×', '+'], operand: [1, 12] }, safeCell: true, enemies: { count: 3, ...WSS, spawnDelay: 2750, tickMult: 0.85 } },
+  /* 16 */ { mode: 'multiples', params: { n: 9, max: 180 },                                                safeCell: true, enemies: { count: 3, ...WSS, spawnDelay: 2500, tickMult: 0.85 } },
+  /* 17 */ { mode: 'factors',   params: { ns: [48], max: 100 },                                            safeCell: true, enemies: { count: 4, ...WS,  spawnDelay: 2500, tickMult: 0.8 } },
+  /* 18 */ { mode: 'equals',    params: { variant: 'lt', ns: [30], ops: ['×', '÷'], operand: [2, 10] },    safeCell: true, enemies: { count: 4, ...WS,  spawnDelay: 2500, tickMult: 0.8 } },
+  /* 19 */ { mode: 'primes',    params: { max: 100 },                                                      safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2250, tickMult: 0.8 } },
+  /* 20 */ { mode: 'multiples', params: { n: 7, max: 140 },                                                safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2250, tickMult: 0.75 } },
+  /* 21 */ { mode: 'factors',   params: { ns: [60, 72], max: 120 },                                        safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2000, tickMult: 0.75 } },
+  /* 22 */ { mode: 'equals',    params: { variant: 'gt', ns: [50], ops: ['+', '−', '×', '÷'], operand: [2, 12] }, safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2000, tickMult: 0.75 } },
+];
+
+
 /* =====================================================================
  * 2. ENGINE
  *    Pure game state + rules. No DOM / canvas / keyboard here.
@@ -362,9 +388,12 @@ const Engine = (() => {
 
   const state = {
     screen: 'title',      // title | playing | paused | levelclear | gameover
-    modeId: CONFIG.mode,
-    params: null,         // current level params
-    level: 1,
+    menuIndex: 0,         // selected title-menu entry (index into CONFIG.menu)
+    track: 'campaign',    // 'campaign' or a mode id (practice)
+    stage: null,          // stageFor(track, level): resolved stage settings
+    modeId: null,         // mode of the current stage
+    params: null,         // current level params (after the mode's setup)
+    level: 1,             // stage number within the track (1-based)
     score: 0,
     lives: CONFIG.startLives,
     cells: [],            // [{ value, eaten, fxT }], row-major; fxT = rewrite highlight
@@ -381,6 +410,7 @@ const Engine = (() => {
     nextEnemyId: 1,
     spawnT: 0,            // ms until next spawn attempt
     safeOn: false,        // safe cells enabled on this level
+    safeDuration: 0,      // how long a safe cell lasts on this level (ms)
     safe: null,           // { col, row, t, dur } while a safe cell is up
     safeT: 0,             // ms until the next safe cell appears (while none is up)
   };
@@ -393,14 +423,44 @@ const Engine = (() => {
   const typeOf = e => ENEMY_TYPES[e.type];
   const interval = t => t.tickMs * (state.enemyCfg.tickMult || 1);
 
-  function levelParams(level) {
-    const list = CONFIG.levels[state.modeId];
-    return list[(level - 1) % list.length];
+  // ---------- campaign / practice tracks ----------
+  // A track is the list of stages one game plays: all of CAMPAIGN, or (practice)
+  // only the CAMPAIGN stages of one mode.
+  function trackStages(track) {
+    const list = track === 'campaign' ? CAMPAIGN : CAMPAIGN.filter(st => st.mode === track);
+    if (!list.length) throw new Error(`No CAMPAIGN stages for track "${track}"`);
+    return list;
   }
-  // Enemy / safe-cell settings clamp to the last entry instead of wrapping.
-  function levelEntryClamped(level) {
-    const list = CONFIG.levels[state.modeId];
-    return list[Math.min(level, list.length) - 1];
+  const trackLabel = track => (track === 'campaign' ? 'Campaign' : `Practice: ${MODES[track].name}`);
+
+  // Resolved settings for stage `level` of a track. Pure: no randomness, no state.
+  // Within the list: the stage as configured. Past the end (k = level - length):
+  // modes keep cycling through the list, difficulty follows CONFIG.escalation.
+  function stageFor(track, level) {
+    const list = trackStages(track), len = list.length;
+    const withDefaults = e => ({ ...NO_ENEMIES, ...(e || {}) });
+    if (level <= len) {
+      const st = list[level - 1];
+      return { modeId: st.mode, params: { ...st.params }, enemies: withDefaults(st.enemies),
+               safeCell: !!st.safeCell, safeDuration: CONFIG.safeCell.duration, rangeScale: 1, k: 0 };
+    }
+    const X = CONFIG.escalation, k = level - len;
+    const base = list[(k - 1) % len], last = withDefaults(list[len - 1].enemies), m = MODES[base.mode];
+    const rangeScale = Math.min(X.rangeMax, 1 + X.rangeStep * k);
+    const lastTick = last.tickMult || 1, baseSafe = CONFIG.safeCell.duration;
+    return {
+      modeId: base.mode,
+      params: m.widen ? m.widen({ ...base.params }, rangeScale) : { ...base.params },
+      enemies: {
+        count: Math.min(CONFIG.enemies.maxOnScreen, last.count + Math.floor(k / X.extraEnemyEvery)),
+        types: X.types,
+        spawnDelay: last.spawnDelay || X.spawnDelay,
+        tickMult: Math.max(Math.min(X.tickFloor, lastTick), lastTick * Math.pow(X.tickDecay, k)),
+      },
+      safeCell: true,
+      safeDuration: Math.max(Math.min(X.safeFloor, baseSafe), baseSafe * Math.pow(X.safeDecay, k)),
+      rangeScale, k,
+    };
   }
 
   // ---------- numbers ----------
@@ -441,12 +501,12 @@ const Engine = (() => {
     };
     state.cells = want.map(w => {
       const v = draw(w) ?? draw(!w);
-      if (v === null) throw new Error(`Level ${state.level}: number range too small for ${total} unique cells`);
+      if (v === null) throw new Error(`${trackLabel(state.track)} stage ${state.level}: number range too small for ${total} unique cells`);
       used.add(v);
       return { value: v, eaten: false, fxT: 0 };
     });
     state.remaining = countRemaining();
-    if (state.remaining < minC) console.warn(`Level ${state.level}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this level's range`);
+    if (state.remaining < minC) console.warn(`${trackLabel(state.track)} stage ${state.level}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this stage's range`);
   }
 
   // A number-altering Grump stepped on cell i: give it a new number that is
@@ -477,26 +537,28 @@ const Engine = (() => {
   }
 
   function startLevel() {
-    const raw = levelParams(state.level);
-    state.params = mode().setup ? mode().setup(raw, rnd) : raw;
+    const st = stageFor(state.track, state.level);
+    state.stage = st;
+    state.modeId = st.modeId;
+    state.params = mode().setup ? mode().setup(st.params, rnd) : st.params;
     buildBoard();
     centrePlayer();
     state.player.chompT = 0;
     state.lockT = 0;
     state.lockKind = null;
     state.flash = null;
-    const entry = levelEntryClamped(state.level);
-    state.enemyCfg = { ...NO_ENEMIES, ...(entry.enemies || {}) };
+    state.enemyCfg = st.enemies;
     state.enemies = [];
     state.spawnT = state.enemyCfg.spawnDelay;
-    state.safeOn = !!entry.safeCell;
+    state.safeOn = st.safeCell;
+    state.safeDuration = st.safeDuration;
     state.safe = null;
     state.safeT = CONFIG.safeCell.firstDelay;
     state.screen = 'playing';
   }
 
-  function newGame() {
-    state.modeId = CONFIG.mode;
+  function newGame(track) {
+    state.track = track;
     state.level = 1;
     state.score = 0;
     state.lives = CONFIG.startLives;
@@ -648,7 +710,7 @@ const Engine = (() => {
       for (let c = 0; c < CONFIG.grid.cols; c++) if (!enemyAt(c, r)) free.push([c, r]);
     if (!free.length) return; // retry next frame
     const [c, r] = free[rnd(0, free.length - 1)];
-    state.safe = { col: c, row: r, t: CONFIG.safeCell.duration, dur: CONFIG.safeCell.duration };
+    state.safe = { col: c, row: r, t: state.safeDuration, dur: state.safeDuration };
   }
 
   function updateSafe(dt) {
@@ -668,7 +730,12 @@ const Engine = (() => {
     if (action === 'blur') { if (s.screen === 'playing') s.screen = 'paused'; return; }
     const go = action === 'eat' || action === 'confirm';
     switch (s.screen) {
-      case 'title':    if (go) newGame(); break;
+      case 'title':
+        if (action === 'up' || action === 'down') {
+          const n = CONFIG.menu.length;
+          s.menuIndex = (s.menuIndex + (action === 'down' ? 1 : n - 1)) % n;
+        } else if (go) newGame(CONFIG.menu[s.menuIndex]);
+        break;
       case 'gameover': if (go && s.screenT <= 0) s.screen = 'title'; break;
       case 'paused':   if (action === 'pause' || go) s.screen = 'playing'; break;
       case 'levelclear': break;
@@ -715,7 +782,7 @@ const Engine = (() => {
 
   // ---------- test / debug hooks (never called by the game itself) ----------
   const debug = {
-    gotoLevel(n) { newGame(); state.level = n; startLevel(); },
+    gotoLevel(n, track = 'campaign') { newGame(track); state.level = n; startLevel(); },
     spawn: (typeId, col, row, dir) => addEnemy(typeId, col, row, dir),
     placePlayer(col, row) { state.player.col = col; state.player.row = row; },
     setSafe(col, row, ms) { // setSafe(null, null, ms) = no safe cell for ms
@@ -725,7 +792,7 @@ const Engine = (() => {
     },
   };
 
-  return { state, handle, update, mode, debug };
+  return { state, handle, update, mode, stageFor, trackStages, trackLabel, debug };
 })();
 
 
@@ -908,18 +975,28 @@ const Render = (() => {
   }
 
   // ---- screens ----
-  function drawTitle(t) {
+  function drawTitle(s, t) {
     rect(0, 0, W, H, P.bg);
-    text(CONFIG.title, W / 2, 30, P.accent, 4, 'center');
-    text('Eat the right numbers!', W / 2, 66, P.dim, 1, 'center');
-    const bob = Math.round(Math.sin(t / 250) * 3);
+    text(CONFIG.title, W / 2, 10, P.accent, 4, 'center');
+    text('Eat the right numbers!', W / 2, 44, P.dim, 1, 'center');
+    const bob = Math.round(Math.sin(t / 250) * 2);
     const chomping = Math.floor(t / 400) % 3 === 0;
-    sprite(chomping ? SPR_CHOMP : SPR_IDLE, W / 2 - 21, 84 + bob, 3, creatureMap(false));
+    sprite(chomping ? SPR_CHOMP : SPR_IDLE, W / 2 - 14, 58 + bob, 2, creatureMap(false));
     const gf = Math.floor(t / 300) % 2;
-    sprite(GRUMP[gf], W / 2 + 40, 100 - gf, 2, grumpMap(ENEMY_TYPES.wanderer.color));
-    sprite(GRUMP[1 - gf], W / 2 - 68, 100 - (1 - gf), 2, grumpMap(ENEMY_TYPES.stalker.color));
-    if (Math.floor(t / 500) % 2 === 0) text('Press Space to start', W / 2, 136, P.number, 1, 'center');
-    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 166, P.dim, 1, 'center');
+    sprite(GRUMP[gf], W / 2 + 30, 60 - gf, 2, grumpMap(ENEMY_TYPES.wanderer.color));
+    sprite(GRUMP[1 - gf], W / 2 - 58, 60 - (1 - gf), 2, grumpMap(ENEMY_TYPES.stalker.color));
+    // menu
+    CONFIG.menu.forEach((id, i) => {
+      const y = 94 + i * 12, sel = i === s.menuIndex;
+      if (sel) {
+        rect(W / 2 - 100, y - 3, 200, 13, P.panel);
+        text('>', W / 2 - 96, y, P.accent);
+        text('<', W / 2 + 91, y, P.accent);
+      }
+      text(Engine.trackLabel(id), W / 2, y, sel ? P.accent : P.dim, 1, 'center');
+    });
+    if (Math.floor(t / 500) % 2 === 0) text('Up/Down choose   Space start', W / 2, 162, P.number, 1, 'center');
+    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 180, P.dim, 1, 'center');
   }
 
   function drawBoard(s, t) {
@@ -929,7 +1006,7 @@ const Render = (() => {
     // header
     rect(0, 0, W, HEADER_H, P.panel);
     text(m.title(s.params), MARGIN, 6, P.accent);
-    text('Level ' + s.level, W - MARGIN, 6, P.number, 1, 'right');
+    text('Stage ' + s.level, W - MARGIN, 6, P.number, 1, 'right');
 
     // grid
     const bad = s.flash && (s.flash.kind === 'bad' || s.flash.kind === 'dead');
@@ -1020,7 +1097,7 @@ const Render = (() => {
 
   function draw(s, t) {
     switch (s.screen) {
-      case 'title': drawTitle(t); break;
+      case 'title': drawTitle(s, t); break;
       case 'playing': drawBoard(s, t); break;
       case 'paused':
         drawBoard(s, t); dim();
@@ -1029,13 +1106,14 @@ const Render = (() => {
         break;
       case 'levelclear':
         drawBoard(s, t);
-        banner([{ s: 'Level clear!', scale: 2 }, { s: 'Bonus +' + s.lastBonus, color: P.number }]);
+        banner([{ s: 'Stage clear!', scale: 2 }, { s: 'Bonus +' + s.lastBonus, color: P.number }]);
         break;
       case 'gameover':
         rect(0, 0, W, H, P.bg);
-        text('Game over', W / 2, 46, P.bad, 3, 'center');
-        text('Score ' + s.score, W / 2, 90, P.number, 2, 'center');
-        text('Reached level ' + s.level, W / 2, 112, P.dim, 1, 'center');
+        text('Game over', W / 2, 40, P.bad, 3, 'center');
+        text('Score ' + s.score, W / 2, 78, P.number, 2, 'center');
+        text(Engine.trackLabel(s.track), W / 2, 104, P.dim, 1, 'center');
+        text(`Stage ${s.level}: ${Engine.mode().title(s.params)}`, W / 2, 116, P.number, 1, 'center');
         if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 150, P.accent, 1, 'center');
         break;
     }
@@ -1091,7 +1169,7 @@ const Input = (() => {
 
 /* ---- boot + main loop ---- */
 document.title = CONFIG.title;
-window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, Engine, Input };
+window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Input };
 window.addEventListener('resize', Render.fit);
 Render.fit();
 Render.canvas.focus();

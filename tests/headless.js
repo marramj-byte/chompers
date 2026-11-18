@@ -149,7 +149,7 @@ function pageHelpers() {
   console.log('-- unique numbers');
   await fresh();
   const uniq = await page.evaluate(() => {
-    const { Engine, CONFIG } = Chompers, n = CONFIG.levels[CONFIG.mode].length;
+    const { Engine, CAMPAIGN } = Chompers, n = CAMPAIGN.length;
     let boards = 0, dupes = 0, tooFew = 0;
     for (let lvl = 1; lvl <= n; lvl++) for (let k = 0; k < 30; k++) {
       Engine.debug.gotoLevel(lvl); boards++;
@@ -158,7 +158,7 @@ function pageHelpers() {
     }
     return { boards, dupes, tooFew };
   });
-  check(uniq.dupes === 0, `no duplicate numbers on ${uniq.boards} generated boards (all levels)`);
+  check(uniq.dupes === 0, `no duplicate numbers on ${uniq.boards} generated boards (all campaign stages)`);
   check(uniq.tooFew === 0, 'every generated board still has at least board.minCorrect correct cells');
 
   // ===================== enemies: spawning =====================
@@ -289,7 +289,7 @@ function pageHelpers() {
   await fresh();
   await page.evaluate(() => {
     const { Engine: E } = Chompers, s = E.state;
-    E.debug.gotoLevel(5);
+    E.debug.gotoLevel(6);              // campaign stage 6: two Grumps, safe cells on
     E.debug.setSafe(0, 0, 5000);
     E.debug.spawn('wanderer', 5, 4);   // one of two -> spawn timer is running
     s.spawnT = 1500;
@@ -314,11 +314,12 @@ function pageHelpers() {
   console.log('-- number rewrites');
   await fresh();
   const rw = await page.evaluate(() => {
-    const { Engine: E, CONFIG } = Chompers, s = E.state, m = E.mode();
-    const lv = CONFIG.levels[CONFIG.mode][8];
+    const { Engine: E, CONFIG, CAMPAIGN } = Chompers, s = E.state;
+    const lv = CAMPAIGN[8]; // stage 9
     lv.enemies = { ...lv.enemies, types: ['wanderer'], spawnDelay: 200 };
     const run = (eatDownTo) => {
       E.debug.gotoLevel(9);
+      const m = E.mode();
       // eat correct cells until `eatDownTo` remain (no Grumps yet: spawn delay hasn't elapsed)
       while (s.remaining > eatDownTo) {
         const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
@@ -350,22 +351,29 @@ function pageHelpers() {
   console.log('-- modes');
   await fresh();
   const boards = await page.evaluate(() => {
-    const { CONFIG, MODES, Engine: E } = Chompers, out = {};
+    const { MODES, Engine: E } = Chompers, out = {};
     for (const id of Object.keys(MODES)) {
-      CONFIG.mode = id;
-      const r = { boards: 0, problems: [], minCorrect: Infinity };
-      for (let L = 1; L <= CONFIG.levels[id].length; L++) for (let k = 0; k < 200; k++) {
-        E.debug.gotoLevel(L); r.boards++;
-        r.minCorrect = Math.min(r.minCorrect, E.state.remaining);
-        const bad = T.boardProblem();
-        if (bad && r.problems.length < 3) r.problems.push(`level ${L}: ${bad}`);
-      }
+      const len = E.trackStages(id).length;
+      const r = { boards: 0, escalated: 0, problems: [], minCorrect: Infinity };
+      const sweep = (L, times) => {
+        for (let k = 0; k < times; k++) {
+          E.debug.gotoLevel(L, id); r.boards++;
+          if (L > len) r.escalated++;
+          if (E.state.modeId !== id) r.problems.push(`stage ${L}: mode ${E.state.modeId}`);
+          r.minCorrect = Math.min(r.minCorrect, E.state.remaining);
+          const bad = T.boardProblem();
+          if (bad && r.problems.length < 3) r.problems.push(`stage ${L}: ${bad}`);
+        }
+      };
+      for (let L = 1; L <= len; L++) sweep(L, 200);                // every configured stage
+      for (let L = len + 1; L <= 2 * len; L++) sweep(L, 50);       // first escalated lap
+      for (const k of [20, 40, 60]) sweep(len + k, 50);           // deep escalation (ranges at rangeMax)
       out[id] = r;
     }
     return out;
   });
   for (const [id, r] of Object.entries(boards)) {
-    check(r.problems.length === 0, `${id}: ${r.boards} boards (200 per level) unique, in range, <= maxChars` + (r.problems.length ? ' ' + JSON.stringify(r.problems) : ''));
+    check(r.problems.length === 0, `${id}: ${r.boards} boards (200 per stage + ${r.escalated} escalated) unique, in range, <= maxChars` + (r.problems.length ? ' ' + JSON.stringify(r.problems) : ''));
     check(r.minCorrect >= 6, `${id}: every board has >= board.minCorrect correct cells (lowest seen ${r.minCorrect})`);
   }
 
@@ -374,9 +382,9 @@ function pageHelpers() {
     const fixed = { '3+9': 12, '4×3': 12, '15−3': 12, '24÷2': 12, '7÷2': NaN, '2−9': -7, '12x12': 144, '9-4': 5, '8/2': 4, 'abc': NaN };
     const fixedBad = Object.entries(fixed).filter(([s, v]) => !Object.is(MathUtil.evalExpr(s), v));
     let checked = 0, mismatches = [];
-    CONFIG.mode = 'equals';
-    for (let L = 1; L <= CONFIG.levels.equals.length; L++) {
-      E.debug.gotoLevel(L);
+    const len = E.trackStages('equals').length;
+    for (let L = 1; L <= len + 8; L++) {             // configured stages + escalated ones
+      E.debug.gotoLevel(L, 'equals');
       const p = E.state.params;
       for (let k = 0; k < 500; k++) {
         const s = m.randomExpr(p, (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1)));
@@ -405,10 +413,9 @@ function pageHelpers() {
 
   const nearMiss = await page.evaluate(() => {
     const { CONFIG, MathUtil, Engine: E } = Chompers;
-    CONFIG.mode = 'primes';
     let wrong = 0, near = 0;
     for (let k = 0; k < 100; k++) {
-      E.debug.gotoLevel(4); // primes to 100
+      E.debug.gotoLevel(4, 'primes'); // practice stage 4 = primes to 100
       for (const c of E.state.cells) if (!MathUtil.isPrime(c.value)) { wrong++; if (c.value === 1 || c.value % 2) near++; }
     }
     // baseline: share of 1 + odd composites among all non-primes in 1..100
@@ -421,8 +428,7 @@ function pageHelpers() {
   const rewrites = await page.evaluate(() => {
     const { CONFIG, Engine: E } = Chompers, s = E.state, out = {};
     for (const [id, L] of [['multiples', 6], ['factors', 4], ['primes', 3], ['equals', 4], ['equals', 6]]) {
-      CONFIG.mode = id;
-      E.debug.gotoLevel(L);
+      E.debug.gotoLevel(L, id); // practice track for that mode
       E.debug.placePlayer(2, 2); E.debug.setSafe(2, 2, 1e9);
       s.enemyCfg = { ...s.enemyCfg, count: 2, types: ['wanderer'] }; // only number-altering Grumps
       s.spawnT = 0;
@@ -439,6 +445,150 @@ function pageHelpers() {
   });
   for (const [k, r] of Object.entries(rewrites))
     check(r.err === null && r.rewrites > 0, `${k}: Wanderer rewrites use the mode's generator (${r.rewrites} rewrites, board stays valid)` + (r.err ? ` (${r.err})` : ''));
+
+  // ===================== campaign + escalation =====================
+  console.log('-- campaign and escalation');
+  await fresh();
+  const camp = await page.evaluate(() => {
+    const { CAMPAIGN, Engine: E } = Chompers;
+    // 1) stageFor follows CAMPAIGN exactly, in order
+    const mismatch = [];
+    CAMPAIGN.forEach((st, i) => {
+      const r = E.stageFor('campaign', i + 1);
+      const same = r.modeId === st.mode && JSON.stringify(r.params) === JSON.stringify(st.params)
+        && r.safeCell === !!st.safeCell && r.enemies.count === (st.enemies ? st.enemies.count : 0) && r.k === 0;
+      if (!same) mismatch.push(i + 1);
+    });
+    // 2) the opening matches the spec'd order
+    const spec = [
+      st => st.mode === 'multiples' && st.params.n === 2,
+      st => st.mode === 'multiples' && st.params.n === 5,
+      st => st.mode === 'factors' && JSON.stringify(st.params.ns) === '[12]',
+      st => st.mode === 'primes' && st.params.max === 30,
+      st => st.mode === 'equals' && st.params.variant === 'eq' && st.params.ops.every(o => o === '+' || o === '−'),
+      st => st.mode === 'multiples' && st.params.n === 3,
+      st => st.mode === 'factors' && JSON.stringify(st.params.ns) === '[24]',
+      st => st.mode === 'equals' && st.params.variant === 'lt',
+      st => st.mode === 'primes' && st.params.max === 50,
+    ];
+    const specBad = spec.map((f, i) => (f(CAMPAIGN[i]) ? null : i + 1)).filter(Boolean);
+    // 3) each mode's first appearance is its gentlest stage (no Grumps beyond 1)
+    const firsts = {};
+    CAMPAIGN.forEach((st, i) => { if (!(st.mode in firsts)) firsts[st.mode] = (st.enemies ? st.enemies.count : 0); });
+    // 4) no two neighbouring stages share a mode after the opening pair
+    const repeats = CAMPAIGN.map((st, i) => (i > 1 && st.mode === CAMPAIGN[i - 1].mode ? i + 1 : null)).filter(Boolean);
+    return { len: CAMPAIGN.length, mismatch, specBad, firsts, repeats };
+  });
+  check(camp.mismatch.length === 0, `stageFor('campaign', n) returns CAMPAIGN[n-1] for all ${camp.len} stages` + (camp.mismatch.length ? ' ' + camp.mismatch : ''));
+  check(camp.specBad.length === 0, 'campaign opens: x2, x5, factors of 12, primes to 30, equal-to (+/-), x3, factors of 24, less-than, primes to 50' + (camp.specBad.length ? ' (wrong at ' + camp.specBad + ')' : ''));
+  check(Object.values(camp.firsts).every(c => c <= 1), 'each mode first appears with at most one Grump ' + JSON.stringify(camp.firsts));
+  check(camp.repeats.length === 0, 'modes rotate: no back-to-back stages of the same mode after stage 2');
+
+  const esc = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, out = {};
+    for (const track of CONFIG.menu) {
+      const len = E.trackStages(track).length, problems = [];
+      let prev = E.stageFor(track, len); // k = 0: the last configured stage
+      const eff = st => ({ count: Math.min(st.enemies.count, CONFIG.enemies.maxOnScreen), tick: st.enemies.tickMult,
+                           safe: st.safeCell ? st.safeDuration : Infinity, range: st.rangeScale });
+      const modes = [];
+      for (let k = 1; k <= 80; k++) {
+        const cur = E.stageFor(track, len + k), a = eff(prev), b = eff(cur);
+        if (b.count < a.count) problems.push(`k=${k}: Grumps ${a.count}->${b.count}`);
+        if (b.tick > a.tick) problems.push(`k=${k}: tickMult ${a.tick}->${b.tick}`);
+        if (b.safe > a.safe) problems.push(`k=${k}: safe ${a.safe}->${b.safe}`);
+        if (b.range < a.range) problems.push(`k=${k}: range ${a.range}->${b.range}`);
+        if (b.tick < CONFIG.escalation.tickFloor - 1e-9 || b.safe < CONFIG.escalation.safeFloor - 1e-9) problems.push(`k=${k}: below a floor`);
+        if (b.count > CONFIG.enemies.maxOnScreen) problems.push(`k=${k}: above maxOnScreen`);
+        modes.push(cur.modeId);
+        prev = cur;
+      }
+      const expectModes = Array.from({ length: 80 }, (_, i) => E.trackStages(track)[i % len].mode);
+      const last = eff(E.stageFor(track, len + 80)), first = eff(E.stageFor(track, len + 1));
+      out[track] = { problems: problems.slice(0, 3), cycles: modes.join() === expectModes.join(),
+                     grew: last.count > first.count && last.tick < first.tick && last.safe < first.safe && last.range > first.range,
+                     end: last };
+    }
+    return out;
+  });
+  for (const [track, r] of Object.entries(esc)) {
+    check(r.problems.length === 0 && r.grew, `${track}: 80 stages past the end, difficulty never eases (Grumps, speed, safe time, range all monotone; ends at ${r.end.count} Grumps, tick x${r.end.tick.toFixed(2)}, safe ${Math.round(r.end.safe)} ms, range x${r.end.range})` + (r.problems.length ? ' ' + JSON.stringify(r.problems) : ''));
+    check(r.cycles, `${track}: past the end, modes keep cycling in track order`);
+  }
+
+  const safeEsc = await page.evaluate(() => {
+    const { CAMPAIGN, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(CAMPAIGN.length + 10);
+    s.spawnT = 1e9; s.safeT = 0;
+    T.sim(16);
+    return { dur: s.safe && s.safe.dur, want: s.stage.safeDuration };
+  });
+  check(safeEsc.dur === safeEsc.want && safeEsc.want < 6000, `escalated stages use the shorter safe-cell duration (${Math.round(safeEsc.dur)} ms)`);
+
+  // ===================== title menu + practice =====================
+  console.log('-- title menu and practice');
+  await fresh();
+  await shot('09-title-menu');
+  const menu = await page.evaluate(() => Chompers.CONFIG.menu);
+  const sel = () => page.evaluate(() => Chompers.Engine.state.menuIndex);
+  await page.keyboard.press('ArrowUp');
+  check((await sel()) === menu.length - 1, 'Up from the top of the menu wraps to the last entry');
+  await page.keyboard.press('ArrowDown');
+  check((await sel()) === 0, 'Down wraps back to Campaign');
+
+  for (let i = 1; i < menu.length; i++) {
+    const id = menu[i];
+    await fresh();
+    for (let k = 0; k < i; k++) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(50);
+    // play it for real: eat every correct cell, let the stage-clear banner run, repeat
+    const run = await page.evaluate(id => {
+      const { CONFIG, Engine: E } = Chompers, s = E.state;
+      const len = E.trackStages(id).length, seen = new Set(), titles = [];
+      if (s.track !== id) return { err: 'track is ' + s.track };
+      for (let stage = 1; stage <= len + 6; stage++) {
+        if (s.screen !== 'playing' || s.level !== stage) return { err: `expected stage ${stage}, got ${s.screen} ${s.level}` };
+        seen.add(s.modeId); titles.push(E.mode().title(s.params));
+        s.enemies = []; s.spawnT = 1e9;               // keep Grumps out of the way
+        const m = E.mode();
+        while (s.screen === 'playing') {
+          const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
+          E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+          E.handle('eat');
+        }
+        T.sim(CONFIG.timing.levelClear + 50);
+      }
+      const resolved = [];
+      for (let L = 1; L <= len + 100; L++) resolved.push(E.stageFor(id, L).modeId);
+      return { seen: [...seen], titles, resolvedOther: resolved.filter(x => x !== id).length, played: len + 6 };
+    }, id);
+    check(!run.err && run.seen.length === 1 && run.seen[0] === id && run.resolvedOther === 0,
+          `practice ${id}: chosen from the menu, ${run.played} stages played (into escalation) and 100 resolved, never another mode` + (run.err ? ` (${run.err})` : ` [${run.titles.slice(0, 4).join(', ')}, ...]`));
+  }
+
+  // game over shows track + stage reached
+  await fresh();
+  for (let k = 0; k < 3; k++) await page.keyboard.press('ArrowDown'); // Practice: Primes
+  await page.keyboard.press('Space');
+  const over = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(3, 'primes');
+    s.spawnT = 1e9;
+    const m = E.mode();
+    for (let k = 0; k < CONFIG.startLives; k++) {
+      const i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
+      E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+      E.handle('eat');
+      T.sim(CONFIG.timing.wrongLock + 50);
+    }
+    T.sim(CONFIG.timing.gameOverGuard + 50);
+    return { screen: s.screen, label: E.trackLabel(s.track), stage: s.level, title: m.title(s.params) };
+  });
+  await page.waitForTimeout(60);
+  await shot('10-gameover-practice');
+  check(over.screen === 'gameover' && over.label === 'Practice: Primes' && over.stage === 3,
+        `game-over screen data: "${over.label}", "Stage ${over.stage}: ${over.title}" (see tests/out/10-gameover-practice.png)`);
 
   // ===================== screenshot of a busy level =====================
   await fresh();
