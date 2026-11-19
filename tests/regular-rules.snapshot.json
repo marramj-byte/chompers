@@ -1,0 +1,6408 @@
+{
+ "campaign": [
+  {
+   "mode": "multiples",
+   "params": {
+    "max": 50,
+    "n": 2
+   },
+   "safeCell": false
+  },
+  {
+   "mode": "multiples",
+   "params": {
+    "max": 100,
+    "n": 5
+   },
+   "safeCell": false
+  },
+  {
+   "enemies": {
+    "count": 1,
+    "spawnDelay": 4000,
+    "tickMult": 1,
+    "types": [
+     "wanderer"
+    ]
+   },
+   "mode": "factors",
+   "params": {
+    "max": 40,
+    "ns": [
+     12
+    ]
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 1,
+    "spawnDelay": 4000,
+    "tickMult": 1,
+    "types": [
+     "wanderer"
+    ]
+   },
+   "mode": "primes",
+   "params": {
+    "max": 30
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 1,
+    "spawnDelay": 4000,
+    "tickMult": 1,
+    "types": [
+     "wanderer"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     10,
+     12
+    ],
+    "operand": [
+     1,
+     15
+    ],
+    "ops": [
+     "+",
+     "−"
+    ],
+    "variant": "eq"
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 2,
+    "spawnDelay": 3500,
+    "tickMult": 1,
+    "types": [
+     "wanderer"
+    ]
+   },
+   "mode": "multiples",
+   "params": {
+    "max": 60,
+    "n": 3
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 2,
+    "spawnDelay": 3500,
+    "tickMult": 1,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "factors",
+   "params": {
+    "max": 60,
+    "ns": [
+     24
+    ]
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 2,
+    "spawnDelay": 3500,
+    "tickMult": 1,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     10,
+     12
+    ],
+    "operand": [
+     1,
+     12
+    ],
+    "ops": [
+     "+",
+     "−"
+    ],
+    "variant": "lt"
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 2,
+    "spawnDelay": 3000,
+    "tickMult": 0.95,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "primes",
+   "params": {
+    "max": 50
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 2,
+    "spawnDelay": 3000,
+    "tickMult": 0.9,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "multiples",
+   "params": {
+    "max": 80,
+    "n": 4
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 3000,
+    "tickMult": 0.9,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     15,
+     20
+    ],
+    "operand": [
+     1,
+     10
+    ],
+    "ops": [
+     "+",
+     "−",
+     "×"
+    ],
+    "variant": "gt"
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 3000,
+    "tickMult": 0.9,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "factors",
+   "params": {
+    "max": 80,
+    "ns": [
+     30,
+     36
+    ]
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 2750,
+    "tickMult": 0.9,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "multiples",
+   "params": {
+    "max": 120,
+    "n": 6
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 2750,
+    "tickMult": 0.85,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "primes",
+   "params": {
+    "max": 75
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 2750,
+    "tickMult": 0.85,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     12,
+     24
+    ],
+    "operand": [
+     1,
+     12
+    ],
+    "ops": [
+     "×",
+     "+"
+    ],
+    "variant": "eq"
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 3,
+    "spawnDelay": 2500,
+    "tickMult": 0.85,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "multiples",
+   "params": {
+    "max": 180,
+    "n": 9
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2500,
+    "tickMult": 0.8,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "factors",
+   "params": {
+    "max": 100,
+    "ns": [
+     48
+    ]
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2500,
+    "tickMult": 0.8,
+    "types": [
+     "wanderer",
+     "stalker"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     30
+    ],
+    "operand": [
+     2,
+     10
+    ],
+    "ops": [
+     "×",
+     "÷"
+    ],
+    "variant": "lt"
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2250,
+    "tickMult": 0.8,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "primes",
+   "params": {
+    "max": 100
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2250,
+    "tickMult": 0.75,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "multiples",
+   "params": {
+    "max": 140,
+    "n": 7
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2000,
+    "tickMult": 0.75,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "factors",
+   "params": {
+    "max": 120,
+    "ns": [
+     60,
+     72
+    ]
+   },
+   "safeCell": true
+  },
+  {
+   "enemies": {
+    "count": 4,
+    "spawnDelay": 2000,
+    "tickMult": 0.75,
+    "types": [
+     "wanderer",
+     "stalker",
+     "stalker"
+    ]
+   },
+   "mode": "equals",
+   "params": {
+    "ns": [
+     50
+    ],
+    "operand": [
+     2,
+     12
+    ],
+    "ops": [
+     "+",
+     "−",
+     "×",
+     "÷"
+    ],
+    "variant": "gt"
+   },
+   "safeCell": true
+  }
+ ],
+ "enemyTypes": {
+  "stalker": {
+   "altersNumbers": false,
+   "name": "Stalker",
+   "randomStepChance": 0.3,
+   "tickMs": 1300
+  },
+  "wanderer": {
+   "altersNumbers": true,
+   "name": "Wanderer",
+   "straightBias": 0.7,
+   "tickMs": 1040
+  }
+ },
+ "rules": {
+  "board": {
+   "correctRatio": 0.45,
+   "maxChars": 6,
+   "minCorrect": 6
+  },
+  "enemies": {
+   "freezeDuringWrongEat": true,
+   "maxOnScreen": 6,
+   "rewriteEaten": false,
+   "spawnMinDistance": 3
+  },
+  "escalation": {
+   "extraEnemyEvery": 4,
+   "maxNumber": 999,
+   "maxOperand": 99,
+   "rangeMax": 3,
+   "rangeStep": 0.1,
+   "safeDecay": 0.93,
+   "safeFloor": 2500,
+   "spawnDelay": 3000,
+   "tickDecay": 0.97,
+   "tickFloor": 0.45,
+   "types": [
+    "wanderer",
+    "stalker",
+    "stalker"
+   ]
+  },
+  "feel": {
+   "deathFlash": true,
+   "deathFlashAlpha": 0.55,
+   "deathFlashColor": "#ffffff",
+   "deathFlashMs": 140,
+   "hitStop": true,
+   "hitStopFrames": 1
+  },
+  "grid": {
+   "cols": 6,
+   "rows": 5
+  },
+  "hiscores": {
+   "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+   "defaultInitials": "AAA",
+   "perTrack": 5
+  },
+  "menu": [
+   "campaign",
+   "multiples",
+   "factors",
+   "primes",
+   "equals"
+  ],
+  "safeCell": {
+   "blinkBefore": 1500,
+   "cooldown": 6000,
+   "duration": 6000,
+   "firstDelay": 4000
+  },
+  "scoring": {
+   "correct": 5,
+   "levelBonus": 10
+  },
+  "startLives": 3,
+  "timing": {
+   "chomp": 180,
+   "deathLock": 1100,
+   "gameOverGuard": 700,
+   "goodFlash": 450,
+   "levelClear": 1800,
+   "rewriteFlash": 350,
+   "wrongLock": 1500
+  }
+ },
+ "stages": {
+  "campaign": [
+   {
+    "enemies": {
+     "count": 0,
+     "spawnDelay": 0,
+     "tickMult": 1,
+     "types": []
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 50,
+     "n": 2
+    },
+    "rangeScale": 1,
+    "safeCell": false,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 0,
+     "spawnDelay": 0,
+     "tickMult": 1,
+     "types": []
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 100,
+     "n": 5
+    },
+    "rangeScale": 1,
+    "safeCell": false,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 40,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 30
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      15
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 60,
+     "n": 3
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 60,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      12
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3000,
+     "tickMult": 0.95,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 50
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 80,
+     "n": 4
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      15,
+      20
+     ],
+     "operand": [
+      1,
+      10
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 80,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 120,
+     "n": 6
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 75
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      12
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2500,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 9
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2500,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 100,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2500,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30
+     ],
+     "operand": [
+      2,
+      10
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 100
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 140,
+     "n": 7
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      50
+     ],
+     "operand": [
+      2,
+      12
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7275,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 1,
+    "modeId": "multiples",
+    "params": {
+     "max": 55,
+     "n": 2
+    },
+    "rangeScale": 1.1,
+    "safeCell": true,
+    "safeDuration": 5580
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7056749999999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 2,
+    "modeId": "multiples",
+    "params": {
+     "max": 120,
+     "n": 5
+    },
+    "rangeScale": 1.2,
+    "safeCell": true,
+    "safeDuration": 5189.400000000001
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.68450475,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 3,
+    "modeId": "factors",
+    "params": {
+     "max": 52,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 1.3,
+    "safeCell": true,
+    "safeDuration": 4826.142000000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6639696074999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 4,
+    "modeId": "primes",
+    "params": {
+     "max": 42
+    },
+    "rangeScale": 1.4,
+    "safeCell": true,
+    "safeDuration": 4488.312060000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6440505192749999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 5,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      23
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1.5,
+    "safeCell": true,
+    "safeDuration": 4174.130215800002
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6247290036967499,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 6,
+    "modeId": "multiples",
+    "params": {
+     "max": 96,
+     "n": 3
+    },
+    "rangeScale": 1.6,
+    "safeCell": true,
+    "safeDuration": 3881.941100694001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6059871335858473,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 7,
+    "modeId": "factors",
+    "params": {
+     "max": 102,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 1.7000000000000002,
+    "safeCell": true,
+    "safeDuration": 3610.2052236454215
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5878075195782719,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 8,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      18,
+      22
+     ],
+     "operand": [
+      1,
+      22
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1.8,
+    "safeCell": true,
+    "safeDuration": 3357.490857990242
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5701732939909239,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 9,
+    "modeId": "primes",
+    "params": {
+     "max": 95
+    },
+    "rangeScale": 1.9,
+    "safeCell": true,
+    "safeDuration": 3122.4664979309255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.553068095171196,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 10,
+    "modeId": "multiples",
+    "params": {
+     "max": 160,
+     "n": 4
+    },
+    "rangeScale": 2,
+    "safeCell": true,
+    "safeDuration": 2903.8938430757603
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5364760523160601,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 11,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      32,
+      42
+     ],
+     "operand": [
+      1,
+      21
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 2.1,
+    "safeCell": true,
+    "safeDuration": 2700.6212740604574
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5203817707465783,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 12,
+    "modeId": "factors",
+    "params": {
+     "max": 176,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 2.2,
+    "safeCell": true,
+    "safeDuration": 2511.5777848762255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5047703176241809,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 13,
+    "modeId": "multiples",
+    "params": {
+     "max": 276,
+     "n": 6
+    },
+    "rangeScale": 2.3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4896272080954555,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 14,
+    "modeId": "primes",
+    "params": {
+     "max": 180
+    },
+    "rangeScale": 2.4000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.47493839185259185,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 15,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 2.5,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4606902400970141,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 16,
+    "modeId": "multiples",
+    "params": {
+     "max": 468,
+     "n": 9
+    },
+    "rangeScale": 2.6,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 17,
+    "modeId": "factors",
+    "params": {
+     "max": 270,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 2.7,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 18,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      84
+     ],
+     "operand": [
+      2,
+      28
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 2.8,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 19,
+    "modeId": "primes",
+    "params": {
+     "max": 290
+    },
+    "rangeScale": 2.9000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 20,
+    "modeId": "multiples",
+    "params": {
+     "max": 420,
+     "n": 7
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 21,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 22,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      150
+     ],
+     "operand": [
+      2,
+      36
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 23,
+    "modeId": "multiples",
+    "params": {
+     "max": 150,
+     "n": 2
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 24,
+    "modeId": "multiples",
+    "params": {
+     "max": 300,
+     "n": 5
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 25,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 26,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 27,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      45
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 28,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 3
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 29,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 30,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30,
+      36
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 31,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 32,
+    "modeId": "multiples",
+    "params": {
+     "max": 240,
+     "n": 4
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 33,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45,
+      60
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 34,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 35,
+    "modeId": "multiples",
+    "params": {
+     "max": 360,
+     "n": 6
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 36,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 37,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 38,
+    "modeId": "multiples",
+    "params": {
+     "max": 540,
+     "n": 9
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 39,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 40,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      90
+     ],
+     "operand": [
+      2,
+      30
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   }
+  ],
+  "equals": [
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      15
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      12
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      15,
+      20
+     ],
+     "operand": [
+      1,
+      10
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      12
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2500,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30
+     ],
+     "operand": [
+      2,
+      10
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      50
+     ],
+     "operand": [
+      2,
+      12
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7275,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 1,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      17
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1.1,
+    "safeCell": true,
+    "safeDuration": 5580
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7056749999999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 2,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      14
+     ],
+     "operand": [
+      1,
+      14
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1.2,
+    "safeCell": true,
+    "safeDuration": 5189.400000000001
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.68450475,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 3,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      20,
+      26
+     ],
+     "operand": [
+      1,
+      13
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1.3,
+    "safeCell": true,
+    "safeDuration": 4826.142000000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6639696074999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 4,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      17
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1.4,
+    "safeCell": true,
+    "safeDuration": 4488.312060000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6440505192749999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 5,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45
+     ],
+     "operand": [
+      2,
+      15
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1.5,
+    "safeCell": true,
+    "safeDuration": 4174.130215800002
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6247290036967499,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 6,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      80
+     ],
+     "operand": [
+      2,
+      19
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1.6,
+    "safeCell": true,
+    "safeDuration": 3881.941100694001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6059871335858473,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 7,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      26
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 1.7000000000000002,
+    "safeCell": true,
+    "safeDuration": 3610.2052236454215
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5878075195782719,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 8,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      18,
+      22
+     ],
+     "operand": [
+      1,
+      22
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 1.8,
+    "safeCell": true,
+    "safeDuration": 3357.490857990242
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5701732939909239,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 9,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      29,
+      38
+     ],
+     "operand": [
+      1,
+      19
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 1.9,
+    "safeCell": true,
+    "safeDuration": 3122.4664979309255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.553068095171196,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 10,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      24
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 2,
+    "safeCell": true,
+    "safeDuration": 2903.8938430757603
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5364760523160601,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 11,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      63
+     ],
+     "operand": [
+      2,
+      21
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 2.1,
+    "safeCell": true,
+    "safeDuration": 2700.6212740604574
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5203817707465783,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 12,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      110
+     ],
+     "operand": [
+      2,
+      26
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 2.2,
+    "safeCell": true,
+    "safeDuration": 2511.5777848762255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5047703176241809,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 13,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      35
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 2.3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4896272080954555,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 14,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      24,
+      29
+     ],
+     "operand": [
+      1,
+      29
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 2.4000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.47493839185259185,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 15,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      38,
+      50
+     ],
+     "operand": [
+      1,
+      25
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 2.5,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4606902400970141,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 16,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      31
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 2.6,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 17,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      81
+     ],
+     "operand": [
+      2,
+      27
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 2.7,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 18,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      140
+     ],
+     "operand": [
+      2,
+      34
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 2.8,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 19,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      44
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 2.9000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 20,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30,
+      36
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 21,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45,
+      60
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 22,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 23,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      90
+     ],
+     "operand": [
+      2,
+      30
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 24,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      150
+     ],
+     "operand": [
+      2,
+      36
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 25,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      45
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 26,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30,
+      36
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 27,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45,
+      60
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 28,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 29,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      90
+     ],
+     "operand": [
+      2,
+      30
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 30,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      150
+     ],
+     "operand": [
+      2,
+      36
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 31,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      45
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 32,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30,
+      36
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 33,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45,
+      60
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 34,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 35,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      90
+     ],
+     "operand": [
+      2,
+      30
+     ],
+     "ops": [
+      "×",
+      "÷"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 36,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      150
+     ],
+     "operand": [
+      2,
+      36
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×",
+      "÷"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 37,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      10,
+      12
+     ],
+     "operand": [
+      1,
+      45
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 38,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      30,
+      36
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "+",
+      "−"
+     ],
+     "variant": "lt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 39,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      45,
+      60
+     ],
+     "operand": [
+      1,
+      30
+     ],
+     "ops": [
+      "+",
+      "−",
+      "×"
+     ],
+     "variant": "gt"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 40,
+    "modeId": "equals",
+    "params": {
+     "ns": [
+      12,
+      24
+     ],
+     "operand": [
+      1,
+      36
+     ],
+     "ops": [
+      "×",
+      "+"
+     ],
+     "variant": "eq"
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   }
+  ],
+  "factors": [
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 40,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 60,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 80,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2500,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 100,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7275,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 1,
+    "modeId": "factors",
+    "params": {
+     "max": 44,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 1.1,
+    "safeCell": true,
+    "safeDuration": 5580
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.7056749999999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 2,
+    "modeId": "factors",
+    "params": {
+     "max": 72,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 1.2,
+    "safeCell": true,
+    "safeDuration": 5189.400000000001
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2000,
+     "tickMult": 0.68450475,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 3,
+    "modeId": "factors",
+    "params": {
+     "max": 104,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 1.3,
+    "safeCell": true,
+    "safeDuration": 4826.142000000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6639696074999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 4,
+    "modeId": "factors",
+    "params": {
+     "max": 140,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 1.4,
+    "safeCell": true,
+    "safeDuration": 4488.312060000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6440505192749999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 5,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 1.5,
+    "safeCell": true,
+    "safeDuration": 4174.130215800002
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6247290036967499,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 6,
+    "modeId": "factors",
+    "params": {
+     "max": 64,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 1.6,
+    "safeCell": true,
+    "safeDuration": 3881.941100694001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2000,
+     "tickMult": 0.6059871335858473,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 7,
+    "modeId": "factors",
+    "params": {
+     "max": 102,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 1.7000000000000002,
+    "safeCell": true,
+    "safeDuration": 3610.2052236454215
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5878075195782719,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 8,
+    "modeId": "factors",
+    "params": {
+     "max": 144,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 1.8,
+    "safeCell": true,
+    "safeDuration": 3357.490857990242
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5701732939909239,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 9,
+    "modeId": "factors",
+    "params": {
+     "max": 190,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 1.9,
+    "safeCell": true,
+    "safeDuration": 3122.4664979309255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.553068095171196,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 10,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 2,
+    "safeCell": true,
+    "safeDuration": 2903.8938430757603
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5364760523160601,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 11,
+    "modeId": "factors",
+    "params": {
+     "max": 84,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 2.1,
+    "safeCell": true,
+    "safeDuration": 2700.6212740604574
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5203817707465783,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 12,
+    "modeId": "factors",
+    "params": {
+     "max": 132,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 2.2,
+    "safeCell": true,
+    "safeDuration": 2511.5777848762255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.5047703176241809,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 13,
+    "modeId": "factors",
+    "params": {
+     "max": 184,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 2.3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4896272080954555,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 14,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 2.4000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.47493839185259185,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 15,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 2.5,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.4606902400970141,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 16,
+    "modeId": "factors",
+    "params": {
+     "max": 104,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 2.6,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 17,
+    "modeId": "factors",
+    "params": {
+     "max": 162,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 2.7,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 18,
+    "modeId": "factors",
+    "params": {
+     "max": 224,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 2.8,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 19,
+    "modeId": "factors",
+    "params": {
+     "max": 290,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 2.9000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 20,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 21,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 22,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 23,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 24,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 25,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 26,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 27,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 28,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 29,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 30,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 31,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 32,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 33,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 34,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 35,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 36,
+    "modeId": "factors",
+    "params": {
+     "max": 120,
+     "ns": [
+      12
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 37,
+    "modeId": "factors",
+    "params": {
+     "max": 180,
+     "ns": [
+      24
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 38,
+    "modeId": "factors",
+    "params": {
+     "max": 240,
+     "ns": [
+      30,
+      36
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 39,
+    "modeId": "factors",
+    "params": {
+     "max": 300,
+     "ns": [
+      48
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2000,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 40,
+    "modeId": "factors",
+    "params": {
+     "max": 360,
+     "ns": [
+      60,
+      72
+     ]
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   }
+  ],
+  "multiples": [
+   {
+    "enemies": {
+     "count": 0,
+     "spawnDelay": 0,
+     "tickMult": 1,
+     "types": []
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 50,
+     "n": 2
+    },
+    "rangeScale": 1,
+    "safeCell": false,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 0,
+     "spawnDelay": 0,
+     "tickMult": 1,
+     "types": []
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 100,
+     "n": 5
+    },
+    "rangeScale": 1,
+    "safeCell": false,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3500,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 60,
+     "n": 3
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3000,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 80,
+     "n": 4
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.9,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 120,
+     "n": 6
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2500,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 9
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.75,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "multiples",
+    "params": {
+     "max": 140,
+     "n": 7
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.7275,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 1,
+    "modeId": "multiples",
+    "params": {
+     "max": 55,
+     "n": 2
+    },
+    "rangeScale": 1.1,
+    "safeCell": true,
+    "safeDuration": 5580
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.7056749999999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 2,
+    "modeId": "multiples",
+    "params": {
+     "max": 120,
+     "n": 5
+    },
+    "rangeScale": 1.2,
+    "safeCell": true,
+    "safeDuration": 5189.400000000001
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.68450475,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 3,
+    "modeId": "multiples",
+    "params": {
+     "max": 78,
+     "n": 3
+    },
+    "rangeScale": 1.3,
+    "safeCell": true,
+    "safeDuration": 4826.142000000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6639696074999999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 4,
+    "modeId": "multiples",
+    "params": {
+     "max": 112,
+     "n": 4
+    },
+    "rangeScale": 1.4,
+    "safeCell": true,
+    "safeDuration": 4488.312060000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6440505192749999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 5,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 6
+    },
+    "rangeScale": 1.5,
+    "safeCell": true,
+    "safeDuration": 4174.130215800002
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6247290036967499,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 6,
+    "modeId": "multiples",
+    "params": {
+     "max": 288,
+     "n": 9
+    },
+    "rangeScale": 1.6,
+    "safeCell": true,
+    "safeDuration": 3881.941100694001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6059871335858473,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 7,
+    "modeId": "multiples",
+    "params": {
+     "max": 238,
+     "n": 7
+    },
+    "rangeScale": 1.7000000000000002,
+    "safeCell": true,
+    "safeDuration": 3610.2052236454215
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5878075195782719,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 8,
+    "modeId": "multiples",
+    "params": {
+     "max": 90,
+     "n": 2
+    },
+    "rangeScale": 1.8,
+    "safeCell": true,
+    "safeDuration": 3357.490857990242
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5701732939909239,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 9,
+    "modeId": "multiples",
+    "params": {
+     "max": 190,
+     "n": 5
+    },
+    "rangeScale": 1.9,
+    "safeCell": true,
+    "safeDuration": 3122.4664979309255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.553068095171196,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 10,
+    "modeId": "multiples",
+    "params": {
+     "max": 120,
+     "n": 3
+    },
+    "rangeScale": 2,
+    "safeCell": true,
+    "safeDuration": 2903.8938430757603
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5364760523160601,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 11,
+    "modeId": "multiples",
+    "params": {
+     "max": 168,
+     "n": 4
+    },
+    "rangeScale": 2.1,
+    "safeCell": true,
+    "safeDuration": 2700.6212740604574
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5203817707465783,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 12,
+    "modeId": "multiples",
+    "params": {
+     "max": 264,
+     "n": 6
+    },
+    "rangeScale": 2.2,
+    "safeCell": true,
+    "safeDuration": 2511.5777848762255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5047703176241809,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 13,
+    "modeId": "multiples",
+    "params": {
+     "max": 414,
+     "n": 9
+    },
+    "rangeScale": 2.3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.4896272080954555,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 14,
+    "modeId": "multiples",
+    "params": {
+     "max": 336,
+     "n": 7
+    },
+    "rangeScale": 2.4000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.47493839185259185,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 15,
+    "modeId": "multiples",
+    "params": {
+     "max": 125,
+     "n": 2
+    },
+    "rangeScale": 2.5,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.4606902400970141,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 16,
+    "modeId": "multiples",
+    "params": {
+     "max": 260,
+     "n": 5
+    },
+    "rangeScale": 2.6,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 17,
+    "modeId": "multiples",
+    "params": {
+     "max": 162,
+     "n": 3
+    },
+    "rangeScale": 2.7,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 18,
+    "modeId": "multiples",
+    "params": {
+     "max": 224,
+     "n": 4
+    },
+    "rangeScale": 2.8,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 19,
+    "modeId": "multiples",
+    "params": {
+     "max": 348,
+     "n": 6
+    },
+    "rangeScale": 2.9000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 20,
+    "modeId": "multiples",
+    "params": {
+     "max": 540,
+     "n": 9
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 21,
+    "modeId": "multiples",
+    "params": {
+     "max": 420,
+     "n": 7
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 22,
+    "modeId": "multiples",
+    "params": {
+     "max": 150,
+     "n": 2
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 23,
+    "modeId": "multiples",
+    "params": {
+     "max": 300,
+     "n": 5
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 24,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 3
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 25,
+    "modeId": "multiples",
+    "params": {
+     "max": 240,
+     "n": 4
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 26,
+    "modeId": "multiples",
+    "params": {
+     "max": 360,
+     "n": 6
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 27,
+    "modeId": "multiples",
+    "params": {
+     "max": 540,
+     "n": 9
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 28,
+    "modeId": "multiples",
+    "params": {
+     "max": 420,
+     "n": 7
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 29,
+    "modeId": "multiples",
+    "params": {
+     "max": 150,
+     "n": 2
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 30,
+    "modeId": "multiples",
+    "params": {
+     "max": 300,
+     "n": 5
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 31,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 3
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 32,
+    "modeId": "multiples",
+    "params": {
+     "max": 240,
+     "n": 4
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 33,
+    "modeId": "multiples",
+    "params": {
+     "max": 360,
+     "n": 6
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 34,
+    "modeId": "multiples",
+    "params": {
+     "max": 540,
+     "n": 9
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 35,
+    "modeId": "multiples",
+    "params": {
+     "max": 420,
+     "n": 7
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 36,
+    "modeId": "multiples",
+    "params": {
+     "max": 150,
+     "n": 2
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 37,
+    "modeId": "multiples",
+    "params": {
+     "max": 300,
+     "n": 5
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 38,
+    "modeId": "multiples",
+    "params": {
+     "max": 180,
+     "n": 3
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 39,
+    "modeId": "multiples",
+    "params": {
+     "max": 240,
+     "n": 4
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 40,
+    "modeId": "multiples",
+    "params": {
+     "max": 360,
+     "n": 6
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   }
+  ],
+  "primes": [
+   {
+    "enemies": {
+     "count": 1,
+     "spawnDelay": 4000,
+     "tickMult": 1,
+     "types": [
+      "wanderer"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 30
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 2,
+     "spawnDelay": 3000,
+     "tickMult": 0.95,
+     "types": [
+      "wanderer",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 50
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 3,
+     "spawnDelay": 2750,
+     "tickMult": 0.85,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 75
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.8,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 0,
+    "modeId": "primes",
+    "params": {
+     "max": 100
+    },
+    "rangeScale": 1,
+    "safeCell": true,
+    "safeDuration": 6000
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.776,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 1,
+    "modeId": "primes",
+    "params": {
+     "max": 33
+    },
+    "rangeScale": 1.1,
+    "safeCell": true,
+    "safeDuration": 5580
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.7527200000000001,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 2,
+    "modeId": "primes",
+    "params": {
+     "max": 60
+    },
+    "rangeScale": 1.2,
+    "safeCell": true,
+    "safeDuration": 5189.400000000001
+   },
+   {
+    "enemies": {
+     "count": 4,
+     "spawnDelay": 2250,
+     "tickMult": 0.7301384,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 3,
+    "modeId": "primes",
+    "params": {
+     "max": 98
+    },
+    "rangeScale": 1.3,
+    "safeCell": true,
+    "safeDuration": 4826.142000000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.708234248,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 4,
+    "modeId": "primes",
+    "params": {
+     "max": 140
+    },
+    "rangeScale": 1.4,
+    "safeCell": true,
+    "safeDuration": 4488.312060000001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.68698722056,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 5,
+    "modeId": "primes",
+    "params": {
+     "max": 45
+    },
+    "rangeScale": 1.5,
+    "safeCell": true,
+    "safeDuration": 4174.130215800002
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6663776039431999,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 6,
+    "modeId": "primes",
+    "params": {
+     "max": 80
+    },
+    "rangeScale": 1.6,
+    "safeCell": true,
+    "safeDuration": 3881.941100694001
+   },
+   {
+    "enemies": {
+     "count": 5,
+     "spawnDelay": 2250,
+     "tickMult": 0.6463862758249039,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 7,
+    "modeId": "primes",
+    "params": {
+     "max": 128
+    },
+    "rangeScale": 1.7000000000000002,
+    "safeCell": true,
+    "safeDuration": 3610.2052236454215
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.6269946875501567,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 8,
+    "modeId": "primes",
+    "params": {
+     "max": 180
+    },
+    "rangeScale": 1.8,
+    "safeCell": true,
+    "safeDuration": 3357.490857990242
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.6081848469236522,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 9,
+    "modeId": "primes",
+    "params": {
+     "max": 57
+    },
+    "rangeScale": 1.9,
+    "safeCell": true,
+    "safeDuration": 3122.4664979309255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5899393015159425,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 10,
+    "modeId": "primes",
+    "params": {
+     "max": 100
+    },
+    "rangeScale": 2,
+    "safeCell": true,
+    "safeDuration": 2903.8938430757603
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5722411224704642,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 11,
+    "modeId": "primes",
+    "params": {
+     "max": 158
+    },
+    "rangeScale": 2.1,
+    "safeCell": true,
+    "safeDuration": 2700.6212740604574
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5550738887963502,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 12,
+    "modeId": "primes",
+    "params": {
+     "max": 220
+    },
+    "rangeScale": 2.2,
+    "safeCell": true,
+    "safeDuration": 2511.5777848762255
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5384216721324597,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 13,
+    "modeId": "primes",
+    "params": {
+     "max": 69
+    },
+    "rangeScale": 2.3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5222690219684859,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 14,
+    "modeId": "primes",
+    "params": {
+     "max": 120
+    },
+    "rangeScale": 2.4000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.5066009513094313,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 15,
+    "modeId": "primes",
+    "params": {
+     "max": 188
+    },
+    "rangeScale": 2.5,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.4914029227701484,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 16,
+    "modeId": "primes",
+    "params": {
+     "max": 260
+    },
+    "rangeScale": 2.6,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.47666083508704393,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 17,
+    "modeId": "primes",
+    "params": {
+     "max": 81
+    },
+    "rangeScale": 2.7,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.46236101003443264,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 18,
+    "modeId": "primes",
+    "params": {
+     "max": 140
+    },
+    "rangeScale": 2.8,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 19,
+    "modeId": "primes",
+    "params": {
+     "max": 218
+    },
+    "rangeScale": 2.9000000000000004,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 20,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 21,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 22,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 23,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 24,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 25,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 26,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 27,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 28,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 29,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 30,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 31,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 32,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 33,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 34,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 35,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 36,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 37,
+    "modeId": "primes",
+    "params": {
+     "max": 90
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 38,
+    "modeId": "primes",
+    "params": {
+     "max": 150
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 39,
+    "modeId": "primes",
+    "params": {
+     "max": 225
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   },
+   {
+    "enemies": {
+     "count": 6,
+     "spawnDelay": 2250,
+     "tickMult": 0.45,
+     "types": [
+      "wanderer",
+      "stalker",
+      "stalker"
+     ]
+    },
+    "k": 40,
+    "modeId": "primes",
+    "params": {
+     "max": 300
+    },
+    "rangeScale": 3,
+    "safeCell": true,
+    "safeDuration": 2500
+   }
+  ]
+ },
+ "trackLabels": {
+  "campaign": "Campaign",
+  "equals": "Practice: Equals/Inequality",
+  "factors": "Practice: Factors",
+  "multiples": "Practice: Multiples",
+  "primes": "Practice: Primes"
+ }
+}

@@ -54,7 +54,7 @@ function pageHelpers() {
     // null if value v is a legal cell for mode id with params p, else a reason
     invalid(id, v, p) {
       const { CONFIG } = Chompers;
-      if (String(v).length > CONFIG.board.maxChars) return `"${v}" longer than ${CONFIG.board.maxChars}`;
+      if (String(v).length > CONFIG.profile.board.maxChars) return `"${v}" longer than ${CONFIG.profile.board.maxChars}`;
       if (id === 'equals') {
         const m = /^(\d+)([+−×÷])(\d+)$/.exec(v);
         if (typeof v !== 'string' || !m) return `"${v}" is not an expression`;
@@ -78,7 +78,7 @@ function pageHelpers() {
       return null;
     },
     isEdge(e) {
-      const { cols, rows } = Chompers.CONFIG.grid;
+      const { cols, rows } = Chompers.CONFIG.profile.grid;
       return e.col === 0 || e.row === 0 || e.col === cols - 1 || e.row === rows - 1;
     },
   };
@@ -109,7 +109,7 @@ function pageHelpers() {
     const { Engine, CONFIG } = window.Chompers, s = Engine.state, m = Engine.mode();
     const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
     if (i < 0) return null;
-    s.player.col = i % CONFIG.grid.cols; s.player.row = Math.floor(i / CONFIG.grid.cols);
+    s.player.col = i % CONFIG.profile.grid.cols; s.player.row = Math.floor(i / CONFIG.profile.grid.cols);
     return i;
   }, want);
 
@@ -172,7 +172,7 @@ function pageHelpers() {
     for (let lvl = 1; lvl <= n; lvl++) for (let k = 0; k < 30; k++) {
       Engine.debug.gotoLevel(lvl); boards++;
       if (T.visibleDupes().length) dupes++;
-      if (Engine.state.remaining < CONFIG.board.minCorrect) tooFew++;
+      if (Engine.state.remaining < CONFIG.profile.board.minCorrect) tooFew++;
     }
     return { boards, dupes, tooFew };
   });
@@ -201,7 +201,7 @@ function pageHelpers() {
       dist: Math.abs(e.col - s.player.col) + Math.abs(e.row - s.player.row) };
     s.player.col = 0; s.player.row = 0; E.debug.setSafe(0, 0, 1e9); // keep the player out of reach
     T.sim(delay * 3);
-    return { before, atSpawn, minDist: CONFIG.enemies.spawnMinDistance, later: s.enemies.length, count: s.enemyCfg.count };
+    return { before, atSpawn, minDist: CONFIG.profile.enemies.spawnMinDistance, later: s.enemies.length, count: s.enemyCfg.count };
   });
   check(spawn.before === 0, 'level 3: nothing spawns before the spawn delay');
   check(spawn.atSpawn && spawn.atSpawn.type === 'wanderer' && spawn.atSpawn.edge,
@@ -234,7 +234,7 @@ function pageHelpers() {
   await shot('07-death');
   const after = await page.evaluate(() => {
     const { Engine: E, CONFIG } = Chompers, s = E.state;
-    T.sim(CONFIG.timing.deathLock + 50, () => s.lockKind === null && 'unlocked'); // stop the step the lock ends
+    T.sim(CONFIG.profile.timing.deathLock + 50, () => s.lockKind === null && 'unlocked'); // stop the step the lock ends
     return { enemies: s.enemies.length, col: s.player.col, row: s.player.row, lock: s.lockKind,
              screen: s.screen, spawnT: s.spawnT, delay: s.enemyCfg.spawnDelay };
   });
@@ -258,7 +258,7 @@ function pageHelpers() {
     s.lives = 1;
     const e = E.debug.spawn('wanderer', s.player.col + 1, s.player.row); e.tickT = 1e9;
     E.handle('right');
-    T.sim(CONFIG.timing.deathLock + 50);
+    T.sim(CONFIG.profile.timing.deathLock + 50);
     return s.screen;
   });
   check(lastLife === 'gameover', 'losing the last life to a Grump ends the game');
@@ -289,7 +289,7 @@ function pageHelpers() {
   check(safe.adjacentTicks > 0, 'Stalker does close in next to the safe cell (so the block was actually exercised)');
 
   const cycle = await page.evaluate(() => {
-    const { Engine: E, CONFIG } = Chompers, s = E.state, sc = CONFIG.safeCell;
+    const { Engine: E, CONFIG } = Chompers, s = E.state, sc = CONFIG.profile.safeCell;
     E.debug.gotoLevel(3); s.spawnT = 1e9;
     T.sim(sc.firstDelay - 100); const early = !!s.safe;
     T.sim(200); const appeared = !!s.safe;
@@ -341,10 +341,10 @@ function pageHelpers() {
       // eat correct cells until `eatDownTo` remain (no Grumps yet: spawn delay hasn't elapsed)
       while (s.remaining > eatDownTo) {
         const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
-        E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+        E.debug.placePlayer(i % CONFIG.profile.grid.cols, Math.floor(i / CONFIG.profile.grid.cols));
         E.handle('eat');
       }
-      const floor = Math.min(s.remaining, CONFIG.board.minCorrect);
+      const floor = Math.min(s.remaining, CONFIG.profile.board.minCorrect);
       const eaten0 = s.cells.filter(c => c.eaten).length;
       E.debug.placePlayer(2, 2); E.debug.setSafe(2, 2, 1e9);
       const values0 = s.cells.map(c => c.value).join();
@@ -355,7 +355,7 @@ function pageHelpers() {
         if (s.remaining !== T.recount()) return 'remaining out of sync';
         if (s.remaining < floor) return `correct cells fell to ${s.remaining} (< ${floor})`;
         if (s.cells.filter(c => c.eaten).length !== eaten0) return 'an eaten cell was refilled';
-        for (const c of s.cells) if (c.fxT === CONFIG.timing.rewriteFlash) rewrites++;
+        for (const c of s.cells) if (c.fxT === CONFIG.profile.timing.rewriteFlash) rewrites++;
       });
       return { err, rewrites, changed: s.cells.map(c => c.value).join() !== values0, enemies: s.enemies.length };
     };
@@ -453,8 +453,8 @@ function pageHelpers() {
       let n = 0;
       const err = T.sim(30000, () => {
         if (s.screen !== 'playing') return 'screen ' + s.screen;
-        if (s.remaining < CONFIG.board.minCorrect) return 'correct cells below minCorrect';
-        for (const c of s.cells) if (c.fxT === CONFIG.timing.rewriteFlash) n++;
+        if (s.remaining < CONFIG.profile.board.minCorrect) return 'correct cells below minCorrect';
+        for (const c of s.cells) if (c.fxT === CONFIG.profile.timing.rewriteFlash) n++;
         return T.boardProblem();
       });
       out[`${id}#${L}`] = { err, rewrites: n };
@@ -504,10 +504,10 @@ function pageHelpers() {
 
   const esc = await page.evaluate(() => {
     const { CONFIG, Engine: E } = Chompers, out = {};
-    for (const track of CONFIG.menu) {
+    for (const track of CONFIG.profile.menu) {
       const len = E.trackStages(track).length, problems = [];
       let prev = E.stageFor(track, len); // k = 0: the last configured stage
-      const eff = st => ({ count: Math.min(st.enemies.count, CONFIG.enemies.maxOnScreen), tick: st.enemies.tickMult,
+      const eff = st => ({ count: Math.min(st.enemies.count, CONFIG.profile.enemies.maxOnScreen), tick: st.enemies.tickMult,
                            safe: st.safeCell ? st.safeDuration : Infinity, range: st.rangeScale });
       const modes = [];
       for (let k = 1; k <= 80; k++) {
@@ -516,8 +516,8 @@ function pageHelpers() {
         if (b.tick > a.tick) problems.push(`k=${k}: tickMult ${a.tick}->${b.tick}`);
         if (b.safe > a.safe) problems.push(`k=${k}: safe ${a.safe}->${b.safe}`);
         if (b.range < a.range) problems.push(`k=${k}: range ${a.range}->${b.range}`);
-        if (b.tick < CONFIG.escalation.tickFloor - 1e-9 || b.safe < CONFIG.escalation.safeFloor - 1e-9) problems.push(`k=${k}: below a floor`);
-        if (b.count > CONFIG.enemies.maxOnScreen) problems.push(`k=${k}: above maxOnScreen`);
+        if (b.tick < CONFIG.profile.escalation.tickFloor - 1e-9 || b.safe < CONFIG.profile.escalation.safeFloor - 1e-9) problems.push(`k=${k}: below a floor`);
+        if (b.count > CONFIG.profile.enemies.maxOnScreen) problems.push(`k=${k}: above maxOnScreen`);
         modes.push(cur.modeId);
         prev = cur;
       }
@@ -547,7 +547,7 @@ function pageHelpers() {
   console.log('-- title menu and practice');
   await fresh();
   await shot('09-title-menu');
-  const menu = await page.evaluate(() => Chompers.CONFIG.menu);
+  const menu = await page.evaluate(() => Chompers.CONFIG.profile.menu);
   const sel = () => page.evaluate(() => Chompers.Engine.state.menuIndex);
   await page.keyboard.press('ArrowUp');
   check((await sel()) === menu.length - 1, 'Up from the top of the menu wraps to the last entry');
@@ -572,10 +572,10 @@ function pageHelpers() {
         const m = E.mode();
         while (s.screen === 'playing') {
           const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
-          E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+          E.debug.placePlayer(i % CONFIG.profile.grid.cols, Math.floor(i / CONFIG.profile.grid.cols));
           E.handle('eat');
         }
-        T.sim(CONFIG.timing.levelClear + 50);
+        T.sim(CONFIG.profile.timing.levelClear + 50);
       }
       const resolved = [];
       for (let L = 1; L <= len + 100; L++) resolved.push(E.stageFor(id, L).modeId);
@@ -594,13 +594,13 @@ function pageHelpers() {
     E.debug.gotoLevel(3, 'primes');
     s.spawnT = 1e9;
     const m = E.mode();
-    for (let k = 0; k < CONFIG.startLives; k++) {
+    for (let k = 0; k < CONFIG.profile.startLives; k++) {
       const i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
-      E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+      E.debug.placePlayer(i % CONFIG.profile.grid.cols, Math.floor(i / CONFIG.profile.grid.cols));
       E.handle('eat');
-      T.sim(CONFIG.timing.wrongLock + 50);
+      T.sim(CONFIG.profile.timing.wrongLock + 50);
     }
-    T.sim(CONFIG.timing.gameOverGuard + 50);
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
     return { screen: s.screen, label: E.trackLabel(s.track), stage: s.level, title: m.title(s.params) };
   });
   await page.waitForTimeout(60);
@@ -612,7 +612,7 @@ function pageHelpers() {
   console.log('-- high scores');
   await fresh();
   const hs = await page.evaluate(() => {
-    const { Engine: E, CONFIG } = Chompers, H = E.Hiscores, cap = CONFIG.hiscores.perTrack;
+    const { Engine: E, CONFIG } = Chompers, H = E.Hiscores, cap = CONFIG.profile.hiscores.perTrack;
     let list = [];
     const ranks = [];
     for (const [name, score] of [['AAA', 50], ['BBB', 10], ['CCC', 30], ['DDD', 30], ['EEE', 70], ['FFF', 20], ['GGG', 5]]) {
@@ -629,7 +629,7 @@ function pageHelpers() {
                  { name: 'X', score: 1, stage: 1 }, { name: 'LOW', score: 2, stage: 1 }, { name: 'LOX', score: 1, stage: 1 },
                  { name: 'OUT', score: 1, stage: 0 }],
       primes: 'not a list', bogusTrack: [{ name: 'BAD', score: 9, stage: 1 }],
-    }, CONFIG.menu, cap);
+    }, CONFIG.profile.menu, cap);
     return { full, ranks, q, clean, tracks: Object.keys(clean) };
   });
   check(hs.full === 'EEE70 AAA50 CCC30 DDD30 FFF20', `insert keeps best-first order, ties stay in arrival order, capped at 5 (${hs.full})`);
@@ -644,14 +644,14 @@ function pageHelpers() {
     const data = { hiscores: { campaign: [{ name: 'RTX', score: 123, stage: 4 }] }, muted: true, initials: 'RTX' };
     const ok = Storage.save(data);
     const back = Storage.load();
-    const raw = JSON.parse(localStorage.getItem(CONFIG.storage.key));
-    localStorage.setItem(CONFIG.storage.key, JSON.stringify({ ...raw, version: 999 }));
+    const raw = JSON.parse(localStorage.getItem(CONFIG.profile.storageKey));
+    localStorage.setItem(CONFIG.profile.storageKey, JSON.stringify({ ...raw, version: 999 }));
     const wrongVersion = Storage.load();
-    localStorage.setItem(CONFIG.storage.key, '{not json');
+    localStorage.setItem(CONFIG.profile.storageKey, '{not json');
     const corrupt = Storage.load();
-    localStorage.removeItem(CONFIG.storage.key);
+    localStorage.removeItem(CONFIG.profile.storageKey);
     return { ok, same: JSON.stringify({ version: CONFIG.storage.version, ...data }) === JSON.stringify(back),
-             keys: Object.keys(localStorage), wrongVersion, corrupt, key: CONFIG.storage.key };
+             keys: Object.keys(localStorage), wrongVersion, corrupt, key: CONFIG.profile.storageKey };
   });
   check(rt.ok && rt.same, `Storage round-trip under one versioned key ("${rt.key}")`);
   check(rt.wrongVersion === null && rt.corrupt === null, 'other versions and corrupt JSON load as "nothing saved"');
@@ -662,12 +662,12 @@ function pageHelpers() {
     s.spawnT = 1e9;
     const eatWhere = want => {
       const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
-      E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+      E.debug.placePlayer(i % CONFIG.profile.grid.cols, Math.floor(i / CONFIG.profile.grid.cols));
       E.handle('eat');
     };
     eatWhere(true); eatWhere(true);
-    for (let k = 0; k < CONFIG.startLives; k++) { eatWhere(false); T.sim(CONFIG.timing.wrongLock + 50); }
-    T.sim(CONFIG.timing.gameOverGuard + 50);
+    for (let k = 0; k < CONFIG.profile.startLives; k++) { eatWhere(false); T.sim(CONFIG.profile.timing.wrongLock + 50); }
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
     return { screen: s.screen, score: s.score };
   });
   await page.keyboard.press('Space');                    // campaign
@@ -681,7 +681,7 @@ function pageHelpers() {
   const saved = await page.evaluate(() => {
     const s = Chompers.Engine.state;
     return { screen: s.screen, top: s.hiscores.campaign[0], newEntry: s.newEntry,
-             stored: JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key)) };
+             stored: JSON.parse(localStorage.getItem(Chompers.CONFIG.profile.storageKey)) };
   });
   await shot('12-gameover-highlight');
   check(saved.screen === 'gameover' && saved.top && saved.top.name === 'ACZ' && saved.newEntry && saved.newEntry.rank === 0,
@@ -709,7 +709,7 @@ function pageHelpers() {
   console.log('-- mute');
   await fresh();
   const muteState = () => page.evaluate(() => ({ state: Chompers.Engine.state.muted, sound: Chompers.Sound.isMuted(),
-    stored: (JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key) || 'null') || {}).muted }));
+    stored: (JSON.parse(localStorage.getItem(Chompers.CONFIG.profile.storageKey) || 'null') || {}).muted }));
   const m0 = await muteState();
   await page.keyboard.press('KeyM'); await page.waitForTimeout(60);
   const m1 = await muteState();
@@ -749,7 +749,7 @@ function pageHelpers() {
     E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); take();
     i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
     E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); take();
-    T.sim(CONFIG.timing.wrongLock + 50); take();
+    T.sim(CONFIG.profile.timing.wrongLock + 50); take();
     s.spawnT = 0; s.safeT = 0; T.sim(32); take();      // spawn + safe cell
     ENEMY_TYPES.stalker.randomStepChance = 0;
     s.enemies = []; E.debug.setSafe(null, null, 1e9);
@@ -764,31 +764,31 @@ function pageHelpers() {
     const { CONFIG, Engine: E, Loop, Render } = Chompers, s = E.state;
     const out = {};
     for (const on of [true, false]) {
-      CONFIG.feel.hitStop = on;
+      CONFIG.profile.feel.hitStop = on;
       E.debug.gotoLevel(1); E.drainEvents();
       const m = E.mode(), i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
       E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat');
       out['hit' + on] = [Loop.step(16), Loop.step(16)];
     }
-    CONFIG.feel.hitStop = true;
+    CONFIG.profile.feel.hitStop = true;
     // death flash: draw the first frame of a death and sample a background pixel
     const px = () => Array.from(document.getElementById('screen').getContext('2d').getImageData(2, 100, 1, 1).data.slice(0, 3));
     for (const on of [true, false]) {
-      CONFIG.feel.deathFlash = on;
+      CONFIG.profile.feel.deathFlash = on;
       E.debug.gotoLevel(5); s.enemies = []; s.spawnT = 1e9; E.debug.setSafe(null, null, 1e9);
       const g = E.debug.spawn('wanderer', s.player.col + 1, s.player.row); g.tickT = 1e9;
       E.handle('right');
       Render.draw(s, performance.now());
       out['flash' + on] = px();
     }
-    CONFIG.feel.deathFlash = true;
+    CONFIG.profile.feel.deathFlash = true;
     return out;
   });
   const bright = rgb => rgb.reduce((a, b) => a + b, 0);
   check(JSON.stringify(feel.hittrue) === '[false,true]' && JSON.stringify(feel.hitfalse) === '[true,true]',
-        `hit-stop holds exactly ${1} frame after a correct eat, and is off when CONFIG.feel.hitStop is false`);
+        `hit-stop holds exactly ${1} frame after a correct eat, and is off when CONFIG.profile.feel.hitStop is false`);
   check(bright(feel.flashtrue) > 400 && bright(feel.flashfalse) < 150,
-        `death screen flash (rgb ${feel.flashtrue}) and none with CONFIG.feel.deathFlash off (rgb ${feel.flashfalse})`);
+        `death screen flash (rgb ${feel.flashtrue}) and none with CONFIG.profile.feel.deathFlash off (rgb ${feel.flashfalse})`);
 
   // ===================== polish: attract mode =====================
   console.log('-- attract mode');
@@ -798,11 +798,11 @@ function pageHelpers() {
     const { CONFIG, Engine: E } = Chompers, s = E.state;
     E.debug.gotoLevel(4, 'factors'); s.spawnT = 1e9;
     const m = E.mode();
-    for (let k = 0; k < CONFIG.startLives; k++) {
+    for (let k = 0; k < CONFIG.profile.startLives; k++) {
       const i = s.cells.findIndex(c => !c.eaten && !m.isCorrect(c.value, s.params));
-      E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); T.sim(CONFIG.timing.wrongLock + 50);
+      E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat'); T.sim(CONFIG.profile.timing.wrongLock + 50);
     }
-    T.sim(CONFIG.timing.gameOverGuard + 50);
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
     E.handle('confirm');                                  // game over -> title
     s.menuIndex = 2;
   });
@@ -810,7 +810,7 @@ function pageHelpers() {
     const skip = new Set(['screen', 'idleT', 'attract', 'events']);
     const s = Chompers.Engine.state;
     return JSON.stringify(Object.fromEntries(Object.entries(s).filter(([k]) => !skip.has(k))))
-      + '|' + localStorage.getItem(Chompers.CONFIG.storage.key);
+      + '|' + localStorage.getItem(Chompers.CONFIG.profile.storageKey);
   });
   const before = await gameSnap();
   const att = await page.evaluate(() => {
@@ -847,6 +847,84 @@ function pageHelpers() {
     return { on, off, stillTitle: s.screen };
   });
   check(auto.on === 'attract' && auto.off === 'title' && auto.stillTitle === 'title', 'the demo loops back to the title by itself; input on the title resets the idle timer');
+
+  // ===================== profiles + themes =====================
+  console.log('-- profiles and themes');
+  const canon = v => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object'
+    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
+  const rulesOf = () => page.evaluate(() => {
+    // same shape as tests/regular-rules.snapshot.json (recorded before profiles existed)
+    const { CONFIG, Engine: E } = Chompers, PR = CONFIG.profile;
+    const enemyTypes = {};
+    for (const [id, t] of Object.entries(PR.enemyTypes)) { const { color, move, ...rest } = t; enemyTypes[id] = rest; }
+    const stages = {};
+    for (const track of PR.menu) {
+      const len = E.trackStages(track).length;
+      stages[track] = Array.from({ length: len + 40 }, (_, i) => E.stageFor(track, i + 1));
+    }
+    return JSON.parse(JSON.stringify({
+      campaign: PR.campaign,
+      rules: { grid: PR.grid, startLives: PR.startLives, scoring: PR.scoring, board: PR.board, timing: PR.timing,
+               enemies: PR.enemies, safeCell: PR.safeCell, feel: PR.feel, escalation: PR.escalation,
+               menu: PR.menu, hiscores: PR.hiscores },
+      enemyTypes,
+      trackLabels: Object.fromEntries(PR.menu.map(t => [t, E.trackLabel(t)])),
+      stages,
+    }));
+  });
+  await page.goto(URL + '?game=regular'); await page.waitForTimeout(150);
+  const regularNow = JSON.stringify(canon(await rulesOf()), null, 1) + '\n';
+  const regularThen = fs.readFileSync(path.join(__dirname, 'regular-rules.snapshot.json'), 'utf8');
+  check(regularNow === regularThen,
+        'regular profile: campaign, rules, Grump tunables, track names and every resolved stage (to 40 past the end) are identical to the pre-profile snapshot');
+
+  // selectGame with fake hostnames (pure function, run in Node on the CONFIG section)
+  const { selectGame: pick } = icons.loadData();
+  const hostCases = [
+    ['chompersjr.realmarras.com', '', 'jr'], ['CHOMPERSJR.example.org', '', 'jr'], ['chompersjr.localhost', '', 'jr'],
+    ['chompers.realmarras.com', '', 'regular'], ['localhost', '', 'regular'], ['127.0.0.1', '', 'regular'], ['', '', 'regular'],
+    ['notchompersjr.com', '', 'regular'], ['www.chompersjr.com', '', 'regular'], ['chompersjr', '', 'regular'],
+    ['chompers.realmarras.com', '?game=jr', 'jr'], ['chompersjr.realmarras.com', '?game=regular', 'regular'],
+    ['chompersjr.realmarras.com', '?game=bogus', 'jr'], ['localhost', '?x=1&game=jr', 'jr'], ['localhost', '?game=', 'regular'],
+  ];
+  const hostBad = hostCases.filter(([h, q, want]) => pick(h, q) !== want).map(([h, q, w]) => `${h}${q} -> ${pick(h, q)} (want ${w})`);
+  check(hostBad.length === 0, `selectGame: ${hostCases.length} hostname / ?game= cases (chompersjr.* -> jr, else regular; ?game= overrides)` + (hostBad.length ? ' ' + hostBad.join('; ') : ''));
+
+  // no "is this jr" branching outside CONFIG: later sections only read profile / theme values
+  const src = fs.readFileSync(path.join(ROOT, 'chompers.html'), 'utf8');
+  const downstream = src.slice(src.indexOf(' * 2. ENGINE'));
+  const engineSrc = src.slice(src.indexOf(' * 2. ENGINE'), src.indexOf(' * 3. RENDER'));
+  // (listing PROFILES / THEMES in the window.Chompers debug object is fine; indexing or comparing is not)
+  const branches = downstream.match(/['"]jr['"]|['"]regular['"]|CONFIG\.game\b|PROFILES\s*[.[]|THEMES\s*[.[]/g) || [];
+  const engineTheme = engineSrc.match(/CONFIG\.theme|THEMES/g) || [];
+  check(engineTheme.length === 0, 'the engine reads CONFIG.profile only (no theme, no THEMES)');
+  check(branches.length === 0, `no game-id branching after CONFIG: later sections only read profile / theme values (found: ${branches.join(', ') || 'none'})`);
+
+  // boot each game: title, footer, storage key
+  await page.evaluate(() => localStorage.clear());
+  const bootAs = async game => {
+    await page.goto(URL + '?game=' + game); await page.waitForTimeout(150);
+    await page.keyboard.press('KeyM');                    // any saved setting will do
+    await page.waitForTimeout(60);
+    return page.evaluate(() => ({
+      game: Chompers.CONFIG.game, title: document.title, themeTitle: Chompers.CONFIG.theme.title,
+      key: Chompers.CONFIG.profile.storageKey, keys: Object.keys(localStorage).sort(),
+      footer: document.getElementById('footer').textContent,
+      grid: Chompers.CONFIG.profile.grid, stages: Chompers.CONFIG.profile.campaign.map(st => st.mode),
+      favicon: document.querySelector('link[rel=icon]').href === Chompers.CONFIG.theme.favicon,
+    }));
+  };
+  const asRegular = await bootAs('regular');
+  const asJr = await bootAs('jr');
+  const DISCLAIMER = 'not affiliated with Number Munchers™ / MECC · for personal play.';
+  check(asRegular.game === 'regular' && asRegular.title === 'Chompers' && asRegular.key === 'chompers.v1' && asRegular.favicon,
+        `?game=regular: "${asRegular.title}", ${asRegular.grid.cols}x${asRegular.grid.rows}, ${asRegular.stages.length} stages, saves to ${asRegular.key}`);
+  check(asJr.game === 'jr' && asJr.title === 'Chompers Jr' && asJr.themeTitle === 'Chompers Jr' && asJr.key === 'chompersjr.v1' && asJr.favicon,
+        `?game=jr: "${asJr.title}", ${asJr.grid.cols}x${asJr.grid.rows}, ${asJr.stages.length} stages, saves to ${asJr.key}`);
+  check(JSON.stringify(asJr.keys) === '["chompers.v1","chompersjr.v1"]' && JSON.stringify(asRegular.keys) === '["chompers.v1"]',
+        'each game saves under its own localStorage key; neither touches the other');
+  check(asRegular.footer === DISCLAIMER && asJr.footer === DISCLAIMER, 'both games keep the disclaimer footer');
+  await page.evaluate(() => localStorage.clear());
 
   // ===================== screenshot of a busy level =====================
   await fresh();
@@ -915,7 +993,7 @@ function pageHelpers() {
   const putOn = (p, want) => p.evaluate(want => {
     const { CONFIG, Engine: E } = Chompers, s = E.state, m = E.mode();
     const i = s.cells.findIndex((c, j) => !c.eaten && m.isCorrect(c.value, s.params) === want && j !== s.player.row * 6 + s.player.col);
-    E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+    E.debug.placePlayer(i % CONFIG.profile.grid.cols, Math.floor(i / CONFIG.profile.grid.cols));
     return i;
   }, want);
 
@@ -1062,8 +1140,8 @@ function pageHelpers() {
       E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat');
     };
     eatWhere(true);
-    for (let k = 0; k < CONFIG.startLives; k++) { eatWhere(false); T.sim(CONFIG.timing.wrongLock + 50); }
-    T.sim(CONFIG.timing.gameOverGuard + 50);
+    for (let k = 0; k < CONFIG.profile.startLives; k++) { eatWhere(false); T.sim(CONFIG.profile.timing.wrongLock + 50); }
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
   });
   const W2 = 160;
   await tapAt(p, W2, 68);                    // up arrow over letter 2 -> moves there, A -> B
@@ -1080,7 +1158,7 @@ function pageHelpers() {
 
   // D-pad mode: toggle on the title, saved, pad works
   await p.tap('#btn-touchMode');
-  const stored = await p.evaluate(() => JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key)));
+  const stored = await p.evaluate(() => JSON.parse(localStorage.getItem(Chompers.CONFIG.profile.storageKey)));
   await p.reload(); await p.waitForTimeout(250);
   const persisted = await p.evaluate(() => Chompers.Input.touchMode());
   check(stored && stored.touchMode === 'pad' && persisted === 'pad', 'TOUCH: TAP / PAD toggle on the title, saved with the other settings');
@@ -1119,9 +1197,10 @@ function pageHelpers() {
     const fav = document.querySelector('link[rel=icon]').href;
     return { script: reg && reg.active && reg.active.scriptURL, version: Chompers.CONFIG.version, man, keys, cached, iconSizes,
              favicon: fav.startsWith('data:image/png;base64,') ? await load(fav) : 'not inline',
-             palette: Chompers.CONFIG.palette };
+             palette: Chompers.CONFIG.theme.palette };
   });
-  check(pwa.script && pwa.script.endsWith('/sw.js?v=' + pwa.version), `service worker registered and active (${pwa.script && pwa.script.replace(/^.*\//, '')})`);
+  check(pwa.script && pwa.script.includes('/sw.js?v=' + pwa.version + '&cache=chompers&manifest=manifest.json'),
+        `service worker registered and active (${pwa.script && pwa.script.replace(/^.*\//, '')})`);
   check(pwa.keys.includes('chompers-' + pwa.version) && ['/chompers.html', '/icons/chompers-192.png', '/icons/chompers-512.png', '/manifest.json'].every(f => pwa.cached.includes(f)),
         `offline cache "chompers-${pwa.version}" holds the page, manifest and icons`);
   const m = pwa.man;
@@ -1129,10 +1208,13 @@ function pageHelpers() {
         && m.theme_color === pwa.palette.panel && m.background_color === pwa.palette.bg,
         'manifest: name, short_name, start_url, standalone, landscape, palette colours');
   check(pwa.iconSizes.join() === '192x192,512x512,192x192,512x512' && pwa.favicon === '32x32', `icons load at ${[...new Set(pwa.iconSizes)].join(' and ')}, inline favicon ${pwa.favicon}`);
-  const art = icons.readArt();
-  const stale = icons.ICONS.filter(({ file, size }) => !icons.decodePng(fs.readFileSync(path.join(ROOT, file))).px.equals(icons.iconPixels(size, {}, art)));
+  const iconData = icons.loadData();
+  const stale = icons.iconList(iconData).filter(({ theme, file, size }) =>
+    !icons.decodePng(fs.readFileSync(path.join(ROOT, file))).px.equals(icons.iconPixels(size, {}, icons.readArt(theme, iconData))));
+  const staleFav = Object.keys(iconData.THEMES).filter(id => iconData.THEMES[id].favicon !== icons.faviconDataUrl(icons.readArt(id, iconData)));
   const favNow = await p.evaluate(() => document.querySelector('link[rel=icon]').href);
-  check(stale.length === 0 && favNow === icons.faviconDataUrl(art), 'icons and favicon match the current Chomper sprite (else: node tests/make-icons.js)');
+  check(stale.length === 0 && staleFav.length === 0 && favNow === iconData.THEMES.regular.favicon,
+        'every theme\'s icons and favicon match its Chomper sprite (else: node tests/make-icons.js)' + (stale.length + staleFav.length ? ' stale: ' + [...stale.map(x => x.file), ...staleFav] : ''));
 
   await L.context.setOffline(true);
   await p.reload();
@@ -1141,6 +1223,38 @@ function pageHelpers() {
   await L.context.setOffline(false);
   check(offline === 'title', 'offline: a reload still starts the game from the cache');
   await L.context.close();
+
+  // the Jr game over http: its own manifest, icons and offline cache
+  const J = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const jp = await J.newPage();
+  jp.on('pageerror', e => mobileErrors.push('jr: ' + e.message));
+  jp.on('console', m => m.type() === 'error' && mobileErrors.push('jr: ' + m.text()));
+  await jp.goto(HTTP + '?game=jr'); await jp.waitForTimeout(250);
+  const jpwa = await jp.evaluate(async () => {
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 5000))]);
+    const link = document.querySelector('link[rel=manifest]');
+    const man = await (await fetch(link.href)).json();
+    const v = Chompers.CONFIG.version, keys = await caches.keys();
+    const cached = keys.includes('chompersjr-' + v) ? (await (await caches.open('chompersjr-' + v)).keys()).map(r => new URL(r.url).pathname).sort() : [];
+    const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); i.src = src; });
+    return { href: link.getAttribute('href'), man, keys, cached, script: reg && reg.active && reg.active.scriptURL,
+             iconW: await Promise.all(man.icons.map(i => load(new URL(i.src, link.href).href))),
+             palette: Chompers.CONFIG.theme.palette, touchIcon: document.querySelector('link[rel=apple-touch-icon]').getAttribute('href') };
+  });
+  check(jpwa.href === 'manifest-jr.json' && jpwa.man.name === 'Chompers Jr' && jpwa.man.short_name === 'Chompers Jr'
+        && jpwa.man.start_url.includes('game=jr') && jpwa.man.theme_color === jpwa.palette.panel && jpwa.man.background_color === jpwa.palette.bg
+        && jpwa.iconW.join() === '192,512,192,512' && jpwa.man.icons.every(i => i.src.includes('chompersjr-')) && jpwa.touchIcon.includes('chompersjr-192'),
+        'jr: its own manifest (name, start_url ?game=jr, palette colours) and icons');
+  check(jpwa.script && jpwa.script.includes('cache=chompersjr') && jpwa.script.includes('manifest=manifest-jr.json')
+        && ['/chompers.html', '/icons/chompersjr-192.png', '/icons/chompersjr-512.png', '/manifest-jr.json'].every(f => jpwa.cached.includes(f))
+        && !jpwa.cached.some(f => f.includes('/icons/chompers-')),
+        `jr: service worker caches the Jr files in "chompersjr-${'<version>'}"`);
+  await J.setOffline(true);
+  await jp.reload(); await jp.waitForTimeout(300);
+  const jOffline = await jp.evaluate(() => typeof Chompers === 'object' && Chompers.CONFIG.game + '/' + document.title);
+  await J.setOffline(false);
+  check(jOffline === 'jr/Chompers Jr', 'jr: offline reload still starts Chompers Jr');
+  await J.close();
 
   // ---- portrait phone ----
   const Pt = await phone({ width: 390, height: 844 });

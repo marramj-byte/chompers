@@ -1,22 +1,32 @@
-// Chompers service worker: offline play.
-// The cache is named from CONFIG.version, which chompers.html passes in the
-// registration URL (sw.js?v=<version>). A new version installs a fresh cache
-// and deletes the old ones.
+// Chompers service worker: offline play for whichever game registered it.
+// chompers.html registers  sw.js?v=<CONFIG.version>&cache=<theme.cacheName>&manifest=<theme.manifest>
+//   cache     "<cacheName>-<version>"; a new version installs a fresh cache and deletes
+//             that game's older ones
+//   files     the page, that game's manifest, and every icon the manifest lists
 //   page (navigation):  network first, so a reload always picks up a new release;
 //                       the cached copy is only used offline
 //   manifest + icons:   cache first
-const VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
-const CACHE = 'chompers-' + VERSION;
-const FILES = ['chompers.html', 'manifest.json', 'icons/chompers-192.png', 'icons/chompers-512.png'];
+const params = new URL(self.location.href).searchParams;
+const VERSION = params.get('v') || 'dev';
+const PREFIX = (params.get('cache') || 'chompers') + '-';
+const MANIFEST = params.get('manifest') || 'manifest.json';
+const CACHE = PREFIX + VERSION;
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const res = await fetch(MANIFEST, { cache: 'no-cache' });
+    const man = await res.clone().json();
+    const cache = await caches.open(CACHE);
+    await cache.put(MANIFEST, res);
+    await cache.addAll(['chompers.html', ...new Set(man.icons.map(i => i.src))]);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith('chompers-') && k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim()));
 });
 
@@ -33,8 +43,8 @@ self.addEventListener('fetch', event => {
           }
           return res;
         })
-        .catch(() => caches.match('chompers.html')));
+        .catch(() => caches.match('chompers.html', { cacheName: CACHE })));
     return;
   }
-  event.respondWith(caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req)));
+  event.respondWith(caches.match(req, { ignoreSearch: true, cacheName: CACHE }).then(hit => hit || fetch(req)));
 });

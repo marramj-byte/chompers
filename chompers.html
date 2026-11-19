@@ -9,7 +9,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Chompers">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAe0lEQVR42mNgGAWjgEjAxyPznxQ89B2AbqDTsRUkYYodNGAOQLcQHRCyGJd6oh0yYA7AFdQwQGxUEFKP0yGDzgGkZjtCeOg6AD1IyeUPXQeMpoGR6wBcBQupfKqXhDRzACGHkBvkFNeGdHfAaIuI2MYoueqGngNGwbAHAPpgQuExoryYAAAAAElFTkSuQmCC">
 <link rel="apple-touch-icon" href="icons/chompers-192.png">
 <style>
   :root { --sat: env(safe-area-inset-top, 0px); --sar: env(safe-area-inset-right, 0px);
@@ -38,65 +37,21 @@
 /* =====================================================================
  * 1. CONFIG / DATA
  *    Everything tunable lives here. Edit freely by hand.
+ *      CONFIG    settings shared by every game (canvas, sound volume, touch, attract demo)
+ *      MODES     the math rules (shared; a profile's stages choose which ones it uses)
+ *      PROFILES  one per game: the RULES (grid, lives, timings, feel, Grumps, stages, scores)
+ *      THEMES    one per game: the LOOK (title, names, palette, sprites, sounds, icons)
+ *    Which game runs is decided once, at the end of this section (selectGame), and
+ *    everything after it reads only CONFIG.profile and CONFIG.theme.
  * ===================================================================== */
 
 const CONFIG = {
-  title: 'Chompers',                 // rename the game here (+ <title> tag and manifest.json)
-  version: '0.5.0',                  // bump on every release: names the offline cache (sw.js)
+  version: '0.6.0',                  // bump on every release: names the offline cache (sw.js)
   view: { width: 320, height: 200 }, // logical canvas resolution
-  grid: { cols: 6, rows: 5 },
-  startLives: 3,
-  // Title-screen menu, top to bottom: 'campaign' plays CAMPAIGN in order; a mode id
-  // is practice: only that mode's CAMPAIGN stages, then the same escalation.
-  menu: ['campaign', 'multiples', 'factors', 'primes', 'equals'],
-
-  scoring: {
-    correct: 5,       // points per correct eat, multiplied by level
-    levelBonus: 10,   // bonus on level clear, multiplied by level
-  },
-
-  board: {
-    correctRatio: 0.45, // chance each cell is a correct answer
-    minCorrect: 6,      // guarantee at least this many correct cells
-    maxChars: 6,        // longest cell text (numbers or expressions); RENDER fits up to 6
-  },
-
-  timing: {             // milliseconds
-    wrongLock: 1500,    // input locked + error message shown after a wrong eat
-    goodFlash: 450,     // "+points" pop after a correct eat
-    chomp: 180,         // mouth-open animation
-    levelClear: 1800,   // "level clear" banner before next level
-    gameOverGuard: 700, // ignore input briefly on game-over screen
-    deathLock: 1100,    // input locked + death animation after a Grump catches you
-    rewriteFlash: 350,  // highlight on a cell whose number a Grump just changed
-  },
-
-  enemies: {
-    maxOnScreen: 6,             // hard cap, whatever a stage asks for (escalation grows toward it)
-    spawnMinDistance: 3,        // spawn edge cell must be at least this many steps from the player
-    freezeDuringWrongEat: true, // Grumps (and their spawn / safe-cell timers) hold still during the wrong-eat lockout
-    rewriteEaten: false,        // number-altering Grumps also refill already-eaten (empty) cells
-  },
-
-  safeCell: {          // milliseconds; turn it off per level with safeCell:false
-    firstDelay: 4000,  // after level start, before the first safe cell appears
-    duration: 6000,    // how long a safe cell lasts
-    cooldown: 6000,    // gap before the next one appears
-    blinkBefore: 1500, // marker blinks during its last this-many ms
-  },
 
   sound: {
     volume: 0.35,          // master volume, 0..1
     mutedByDefault: false, // first visit only; after that the saved M toggle wins
-  },
-
-  feel: {
-    deathFlash: true,      // whole-screen flash when a Grump catches you
-    deathFlashMs: 140,
-    deathFlashColor: '#ffffff',
-    deathFlashAlpha: 0.55, // opacity at the start of the flash (fades to 0)
-    hitStop: true,         // freeze the game briefly on a correct eat
-    hitStopFrames: 1,      // how many animation frames to hold
   },
 
   attract: {
@@ -104,15 +59,9 @@ const CONFIG = {
     idleMs: 20000,         // idle time on the title screen before the demo starts
     durationMs: 25000,     // demo length before it returns to the title by itself
     grumps: 4,
-    types: ['wanderer', 'wanderer', 'stalker'],
+    types: ['wanderer', 'wanderer', 'stalker'], // ids from the profile's enemyTypes
     tickMult: 0.8,         // demo Grump speed
     retargetMs: 2500,      // Stalkers chase an invisible point that moves this often
-  },
-
-  hiscores: {
-    perTrack: 5,           // table size for each of CONFIG.menu's tracks
-    alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-    defaultInitials: 'AAA',
   },
 
   touch: {                 // touch layer (INPUT); sizes are CSS px
@@ -128,52 +77,18 @@ const CONFIG = {
     rotateHintMs: 5000,    // portrait "rotate for best play" hint
   },
 
-  storage: {               // one localStorage entry holds high scores, mute, last initials, touch mode
-    key: 'chompers.v1',    // bump the version (key and number) if the saved shape ever changes
-    version: 1,
+  storage: {               // each game saves to its own key (profile.storageKey)
+    version: 1,            // bump (with the keys) if the saved shape ever changes
   },
 
-  // Past the last stage of a track the game does NOT loop. With k = stage - trackLength
-  // (1, 2, 3, ...), modes keep cycling through the track's stages in order, and
-  // difficulty comes from this formula ("last" = the track's final stage):
-  //   rangeScale   = min(rangeMax, 1 + rangeStep * k)      passed to the mode's widen()
-  //   Grumps       = min(enemies.maxOnScreen, last.count + floor(k / extraEnemyEvery))
-  //   tickMult     = max(min(tickFloor, last), last.tickMult * tickDecay^k)
-  //   safe cell    = on, lasting max(min(safeFloor, base), safeCell.duration * safeDecay^k) ms
-  //   Grump types  = types;  spawnDelay = last.spawnDelay (or spawnDelay below if it has none)
-  escalation: {
-    rangeStep: 0.1, rangeMax: 3,
-    extraEnemyEvery: 4,
-    tickDecay: 0.97, tickFloor: 0.45, // multipliers on each type's tickMs, so they scale with it
-    safeDecay: 0.93, safeFloor: 2500,
-    types: ['wanderer', 'stalker', 'stalker'],
-    spawnDelay: 3000,
-    maxNumber: 999,  // widened ranges never exceed this (keeps numbers to 3 characters)
-    maxOperand: 99,  // widened expression operands never exceed this
-  },
+  // Which game a page runs: the first hostname match wins, else defaultGame.
+  // ?game=<id> in the URL overrides both (local testing).
+  hosts: [
+    { match: /^chompersjr\./i, game: 'jr' },
+  ],
+  defaultGame: 'regular',
 
-  palette: {
-    bg:         '#141226',
-    panel:      '#1f1b3a',
-    cell:       '#2a2552',
-    cellEdge:   '#463e8c',
-    cellEaten:  '#18152f',
-    number:     '#ece8ff',
-    dim:        '#8a86a8',
-    accent:     '#ffd25a',
-    good:       '#5de08a',
-    bad:        '#ff5a6e',
-    safeFill:   '#1d4560',
-    safeEdge:   '#7fd8ff',
-    rewrite:    '#ffd25a',
-    // creature
-    outline:    '#0e0c1c',
-    body:       '#42c6a8',
-    bodyHurt:   '#ff7a88',
-    eye:        '#ffffff',
-    mouth:      '#0e0c1c',
-    tooth:      '#ffffff',
-  },
+  game: null, profile: null, theme: null, // set once by selectGame() at the end of this section
 };
 
 // ---- small pure math helpers used by MODES ----
@@ -215,12 +130,12 @@ const MathUtil = {
 //   setup(p, rnd)             -> turns stage params into concrete params once per level
 //                                (e.g. picks N from a list). Default: use them as-is.
 //   widen(p, f)               -> stage params with ranges widened by factor f >= 1, used
-//                                past the end of a track (CONFIG.escalation). Default: unchanged.
+//                                past the end of a track (profile.escalation). Default: unchanged.
 // Cell values may be numbers or short strings (expressions); uniqueness on a board is by
 // displayed text, and every value must fit in board.maxChars characters.
 // rnd(lo, hi) returns an integer in [lo, hi].
 const pickN = (p, rnd) => ({ ...p, n: Array.isArray(p.ns) ? MathUtil.pick(p.ns, rnd) : p.n });
-const widenMax = (p, f) => ({ ...p, max: Math.min(CONFIG.escalation.maxNumber, Math.round(p.max * f)) });
+const widenMax = (p, f) => ({ ...p, max: Math.min(CONFIG.profile.escalation.maxNumber, Math.round(p.max * f)) });
 
 const MODES = {
   multiples: {
@@ -315,7 +230,7 @@ const MODES = {
     // larger operands; for less/greater-than the target N scales too (equal-to keeps N)
     widen(p, f) {
       const scaleN = n => (p.variant === 'eq' ? n : Math.round(n * f));
-      const hi = Math.min(CONFIG.escalation.maxOperand, Math.max(p.operand[1], Math.round(p.operand[1] * f)));
+      const hi = Math.min(CONFIG.profile.escalation.maxOperand, Math.max(p.operand[1], Math.round(p.operand[1] * f)));
       const out = { ...p, operand: [p.operand[0], hi] };
       if (Array.isArray(p.ns)) out.ns = p.ns.map(scaleN);
       if (p.n !== undefined) out.n = scaleN(p.n);
@@ -335,7 +250,7 @@ const MODES = {
       if (op === '−' && a < b) [a, b] = [b, a];
       if (op === '÷') { b = Math.max(1, b); a *= b; } // a was the quotient
       const s = `${a}${op}${b}`;
-      return s.length <= CONFIG.board.maxChars ? s : null;
+      return s.length <= CONFIG.profile.board.maxChars ? s : null;
     },
     makeValue(p, want, rnd) {
       const near = !want && Math.random() < this.nearMissChance;
@@ -353,51 +268,34 @@ const MODES = {
   },
 };
 
-// Enemies ("Grumps"). Each type:
-//   name           shown when it catches you
-//   color          body colour of its sprite
-//   tickMs         ms between steps (multiplied by the level's tickMult)
-//   altersNumbers  true = rewrites the number in every cell it steps on
-//   move(e, w, t)  returns a direction [dc, dr] to step, or null to stay put
-//                  e: { col, row, dir }   t: this type entry (for its tunables)
-//                  w: { cols, rows, player:{col,row}, dirs, canEnter(c,r), random(), rnd(lo,hi) }
-//                  Only directions where w.canEnter(...) is true are legal
-//                  (inside the grid and not the safe cell). Anything else is ignored.
-const ENEMY_TYPES = {
-  wanderer: {
-    name: 'Wanderer',
-    color: '#f0913c',
-    tickMs: 1040,
-    altersNumbers: true,
-    straightBias: 0.7, // chance to keep its current heading when it can
-    move(e, w, t) {
-      const open = w.dirs.filter(d => w.canEnter(e.col + d[0], e.row + d[1]));
-      if (!open.length) return null;
-      const ahead = open.find(d => d[0] === e.dir[0] && d[1] === e.dir[1]);
-      if (ahead && w.random() < t.straightBias) return ahead;
-      const noReverse = open.filter(d => !(d[0] === -e.dir[0] && d[1] === -e.dir[1]));
-      const pool = noReverse.length ? noReverse : open;
-      return pool[w.rnd(0, pool.length - 1)];
-    },
+// Grump movement, shared by every profile's Grump kit. move(e, w, t) returns a
+// direction [dc, dr] to step, or null to stay put.
+//   e: { col, row, dir }   t: the Grump type entry (for its tunables)
+//   w: { cols, rows, player:{col,row}, dirs, canEnter(c,r), random(), rnd(lo,hi) }
+// Only directions where w.canEnter(...) is true are legal (inside the grid and not
+// the safe cell). Anything else is ignored.
+const MOVES = {
+  // random walk that tends to keep its heading (t.straightBias)
+  wander(e, w, t) {
+    const open = w.dirs.filter(d => w.canEnter(e.col + d[0], e.row + d[1]));
+    if (!open.length) return null;
+    const ahead = open.find(d => d[0] === e.dir[0] && d[1] === e.dir[1]);
+    if (ahead && w.random() < t.straightBias) return ahead;
+    const noReverse = open.filter(d => !(d[0] === -e.dir[0] && d[1] === -e.dir[1]));
+    const pool = noReverse.length ? noReverse : open;
+    return pool[w.rnd(0, pool.length - 1)];
   },
-  stalker: {
-    name: 'Stalker',
-    color: '#d062e8',
-    tickMs: 1300,
-    altersNumbers: false,
-    randomStepChance: 0.3, // chance a step is random instead of toward the player
-    move(e, w, t) {
-      const open = w.dirs.filter(d => w.canEnter(e.col + d[0], e.row + d[1]));
-      if (!open.length) return null;
-      if (w.random() < t.randomStepChance) return open[w.rnd(0, open.length - 1)];
-      const dist = d => Math.abs(e.col + d[0] - w.player.col) + Math.abs(e.row + d[1] - w.player.row);
-      const best = Math.min(...open.map(dist));
-      const pick = open.filter(d => dist(d) === best);
-      return pick[w.rnd(0, pick.length - 1)];
-    },
+  // one step toward the player, or a random step with chance t.randomStepChance
+  stalk(e, w, t) {
+    const open = w.dirs.filter(d => w.canEnter(e.col + d[0], e.row + d[1]));
+    if (!open.length) return null;
+    if (w.random() < t.randomStepChance) return open[w.rnd(0, open.length - 1)];
+    const dist = d => Math.abs(e.col + d[0] - w.player.col) + Math.abs(e.row + d[1] - w.player.row);
+    const best = Math.min(...open.map(dist));
+    const pick = open.filter(d => dist(d) === best);
+    return pick[w.rnd(0, pick.length - 1)];
   },
 };
-
 
 // The campaign: one stage per level, played in order. Each stage:
 //   mode      id from MODES
@@ -409,11 +307,11 @@ const ENEMY_TYPES = {
 //             tickMult   multiplies every Grump's tick interval (smaller = faster)
 //   safeCell  true/false: whether safe cells appear (they last safeCell.duration)
 // Modes rotate, and each mode's first stage is its gentlest. Practice mode plays
-// only one mode's stages from this list. Past the end: see CONFIG.escalation.
+// only one mode's stages from this list. Past the end: see the profile's escalation.
 // Every stage needs enough values for a unique 30-cell board with >= board.minCorrect
 // correct ones (the headless test checks every stage).
 const W1 = { types: ['wanderer'] }, WS = { types: ['wanderer', 'stalker'] }, WSS = { types: ['wanderer', 'stalker', 'stalker'] };
-const CAMPAIGN = [
+const REGULAR_CAMPAIGN = [
   /*  1 */ { mode: 'multiples', params: { n: 2, max: 50 },                                                 safeCell: false },
   /*  2 */ { mode: 'multiples', params: { n: 5, max: 100 },                                                safeCell: false },
   /*  3 */ { mode: 'factors',   params: { ns: [12], max: 40 },                                             safeCell: true, enemies: { count: 1, ...W1,  spawnDelay: 4000, tickMult: 1.0 } },
@@ -438,6 +336,245 @@ const CAMPAIGN = [
   /* 22 */ { mode: 'equals',    params: { variant: 'gt', ns: [50], ops: ['+', '−', '×', '÷'], operand: [2, 12] }, safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2000, tickMult: 0.75 } },
 ];
 
+// A profile = the RULES of one game. Everything the engine reads comes from here.
+//   storageKey   localStorage key for this game's scores and settings
+//   grid, startLives, scoring, board, timing, enemies, safeCell, feel, escalation
+//                as documented on PROFILES.regular below
+//   menu         title-menu tracks, top to bottom: 'campaign' plays the whole campaign;
+//                a mode id is practice (only that mode's stages, then escalation)
+//   trackNames   label of each track (menu, high-score tables, game over)
+//   hiscores     table size, initials alphabet; optional presets: [...] replaces
+//                letter-by-letter entry with picking one of these names
+//   enemyTypes   the Grump kit: { id: { name, tickMs, altersNumbers, move, ...tunables } }
+//                name: shown when it catches you; tickMs: ms between steps (times the
+//                stage's tickMult); altersNumbers: rewrites every cell it steps on
+//   campaign     the stage list (see REGULAR_CAMPAIGN)
+const PROFILES = {
+  regular: {
+    storageKey: 'chompers.v1',
+    grid: { cols: 6, rows: 5 },
+    startLives: 3,
+    menu: ['campaign', 'multiples', 'factors', 'primes', 'equals'],
+    trackNames: {
+      campaign: 'Campaign', multiples: 'Practice: Multiples', factors: 'Practice: Factors',
+      primes: 'Practice: Primes', equals: 'Practice: Equals/Inequality',
+    },
+
+    scoring: {
+      correct: 5,       // points per correct eat, multiplied by level
+      levelBonus: 10,   // bonus on level clear, multiplied by level
+    },
+
+    board: {
+      correctRatio: 0.45, // chance each cell is a correct answer
+      minCorrect: 6,      // guarantee at least this many correct cells
+      maxChars: 6,        // longest cell text (numbers or expressions); RENDER fits up to 6
+    },
+
+    timing: {             // milliseconds
+      wrongLock: 1500,    // input locked + error message shown after a wrong eat
+      goodFlash: 450,     // "+points" pop after a correct eat
+      chomp: 180,         // mouth-open animation
+      levelClear: 1800,   // "level clear" banner before next level
+      gameOverGuard: 700, // ignore input briefly on game-over screen
+      deathLock: 1100,    // input locked + death animation after a Grump catches you
+      rewriteFlash: 350,  // highlight on a cell whose number a Grump just changed
+    },
+
+    enemies: {
+      maxOnScreen: 6,             // hard cap, whatever a stage asks for (escalation grows toward it)
+      spawnMinDistance: 3,        // spawn edge cell must be at least this many steps from the player
+      freezeDuringWrongEat: true, // Grumps (and their spawn / safe-cell timers) hold still during the wrong-eat lockout
+      rewriteEaten: false,        // number-altering Grumps also refill already-eaten (empty) cells
+    },
+
+    safeCell: {          // milliseconds; turn it off per stage with safeCell:false
+      firstDelay: 4000,  // after level start, before the first safe cell appears
+      duration: 6000,    // how long a safe cell lasts
+      cooldown: 6000,    // gap before the next one appears
+      blinkBefore: 1500, // marker blinks during its last this-many ms
+    },
+
+    feel: {
+      deathFlash: true,      // whole-screen flash when a Grump catches you
+      deathFlashMs: 140,
+      deathFlashColor: '#ffffff',
+      deathFlashAlpha: 0.55, // opacity at the start of the flash (fades to 0)
+      hitStop: true,         // freeze the game briefly on a correct eat
+      hitStopFrames: 1,      // how many animation frames to hold
+    },
+
+    hiscores: {
+      perTrack: 5,           // table size for each menu track
+      alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      defaultInitials: 'AAA',
+    },
+
+    // Past the last stage of a track the game does NOT loop. With k = stage - trackLength
+    // (1, 2, 3, ...), modes keep cycling through the track's stages in order, and
+    // difficulty comes from this formula ("last" = the track's final stage):
+    //   rangeScale   = min(rangeMax, 1 + rangeStep * k)      passed to the mode's widen()
+    //   Grumps       = min(enemies.maxOnScreen, last.count + floor(k / extraEnemyEvery))
+    //   tickMult     = max(min(tickFloor, last), last.tickMult * tickDecay^k)
+    //   safe cell    = on, lasting max(min(safeFloor, base), safeCell.duration * safeDecay^k) ms
+    //   Grump types  = types;  spawnDelay = last.spawnDelay (or spawnDelay below if it has none)
+    escalation: {
+      rangeStep: 0.1, rangeMax: 3,
+      extraEnemyEvery: 4,
+      tickDecay: 0.97, tickFloor: 0.45, // multipliers on each type's tickMs, so they scale with it
+      safeDecay: 0.93, safeFloor: 2500,
+      types: ['wanderer', 'stalker', 'stalker'],
+      spawnDelay: 3000,
+      maxNumber: 999,  // widened ranges never exceed this (keeps numbers to 3 characters)
+      maxOperand: 99,  // widened expression operands never exceed this
+    },
+
+    enemyTypes: {
+      wanderer: { name: 'Wanderer', tickMs: 1040, altersNumbers: true,  straightBias: 0.7,     move: MOVES.wander },
+      stalker:  { name: 'Stalker',  tickMs: 1300, altersNumbers: false, randomStepChance: 0.3, move: MOVES.stalk },
+    },
+
+    campaign: REGULAR_CAMPAIGN,
+  },
+};
+// placeholder until the Jr rules land: regular rules, separate saves
+PROFILES.jr = { ...PROFILES.regular, storageKey: 'chompersjr.v1' };
+
+// A theme = the LOOK of one game. Only RENDER, SOUND and the boot code read it.
+//   title, characterName, grumpName   names shown in the game
+//   footer        page footer (must keep the disclaimer)
+//   manifest, icons, favicon, cacheName   PWA files for this game (favicon: inline
+//                 data URL written by tests/make-icons.js; cacheName: offline cache prefix)
+//   sound         { pitch, tempo }: multiplies every synth frequency / playback speed
+//   titleLayout   positions on the title screen (canvas pixels)
+//   palette       all colours; grumpColors: body colour per Grump type
+//   sprites       idle / chomp / dead (14 wide; o outline, b body, w eye, k pupil/mouth,
+//                 t tooth, p cheek), grumpHalf (left halves, mirrored; c = body colour),
+//                 grumpFeet (two walk frames), safeIcon
+//   wrongText(msg), deathText(msg)   optional rewrites of the wrong-eat / caught messages
+const THEMES = {
+  regular: {
+    title: 'Chompers',
+    characterName: 'Chomper',
+    grumpName: 'Grump',
+    footer: 'not affiliated with Number Munchers™ / MECC · for personal play.',
+    manifest: 'manifest.json',
+    cacheName: 'chompers',
+    icons: { 192: 'icons/chompers-192.png', 512: 'icons/chompers-512.png' },
+    favicon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAe0lEQVR42mNgGAWjgEjAxyPznxQ89B2AbqDTsRUkYYodNGAOQLcQHRCyGJd6oh0yYA7AFdQwQGxUEFKP0yGDzgGkZjtCeOg6AD1IyeUPXQeMpoGR6wBcBQupfKqXhDRzACGHkBvkFNeGdHfAaIuI2MYoueqGngNGwbAHAPpgQuExoryYAAAAAElFTkSuQmCC', // generated by tests/make-icons.js (regular)
+    sound: { pitch: 1, tempo: 1 },
+    titleLayout: { titleScale: 4, titleY: 8, tagline: 'Eat the right numbers!', taglineY: 40,
+                   ground: 79, menuY: 90, menuStep: 12 },
+    palette: {
+      bg:         '#141226',
+      panel:      '#1f1b3a',
+      cell:       '#2a2552',
+      cellEdge:   '#463e8c',
+      cellEaten:  '#18152f',
+      number:     '#ece8ff',
+      dim:        '#8a86a8',
+      accent:     '#ffd25a',
+      good:       '#5de08a',
+      bad:        '#ff5a6e',
+      safeFill:   '#1d4560',
+      safeEdge:   '#7fd8ff',
+      rewrite:    '#ffd25a',
+      // creature
+      outline:    '#0e0c1c',
+      body:       '#42c6a8',
+      bodyHurt:   '#ff7a88',
+      eye:        '#ffffff',
+      mouth:      '#0e0c1c',
+      tooth:      '#ffffff',
+    },
+    grumpColors: { wanderer: '#f0913c', stalker: '#d062e8' },
+    sprites: {
+      idle: [
+        '....oooooo....',
+        '..oobbbbbboo..',
+        '.obbbbbbbbbbo.',
+        '.obwwbbbbwwbo.',
+        'obbwkbbbbwkbbo',
+        'obbbbbbbbbbbbo',
+        'obbkbbbbbbkbbo',
+        'obbbkkkkkkbbbo',
+        '.obbbbbbbbbbo.',
+        '..oobbbbbboo..',
+        '...ooo..ooo...',
+      ],
+      chomp: [
+        '....oooooo....',
+        '..oobbbbbboo..',
+        '.obwwbbbbwwbo.',
+        'obbwkbbbbwkbbo',
+        'obkkkkkkkkkkbo',
+        'obktktktktktbo',
+        'obkkkkkkkkkkbo',
+        'obkkkkkkkkkkbo',
+        'obbtktktktkbbo',
+        '.obbkkkkkkbbo.',
+        '..oobbbbbboo..',
+        '...ooo..ooo...',
+      ],
+      dead: [ // X-eyes, shocked mouth
+        '....oooooo....',
+        '..oobbbbbboo..',
+        '.obkbkbbkbkbo.',
+        '.obbkbbbbkbbo.',
+        'obbkbkbbkbkbbo',
+        'obbbbbbbbbbbbo',
+        'obbbbbkkbbbbbo',
+        'obbbbkbbkbbbbo',
+        '.obbbbkkbbbbo.',
+        '..oobbbbbboo..',
+        '...ooo..ooo...',
+      ],
+      // Grump: left halves, mirrored by RENDER; brows slope inward, eyes glare inward
+      grumpHalf: [
+        '...oooo',
+        '..occcc',
+        '.occccc',
+        '.okkccc',
+        'occkkcc',
+        'occwkcc',
+        'occcccc',
+        'occkkkk',
+        'occktkt',
+        '.occccc',
+        '..ooooo',
+      ],
+      grumpFeet: ['.oo........oo.', '...oo....oo...'], // feet apart / together (drawn 1px higher = waddle)
+      safeIcon: ['.ooo.', 'ooooo', 'ooooo', '.ooo.', '..o..'],
+    },
+    wrongText: null,
+    deathText: null,
+  },
+};
+// placeholder until the Jr look lands: regular look, its own name, icons and cache
+THEMES.jr = {
+  ...THEMES.regular,
+  title: 'Chompers Jr',
+  manifest: 'manifest-jr.json',
+  cacheName: 'chompersjr',
+  icons: { 192: 'icons/chompersjr-192.png', 512: 'icons/chompersjr-512.png' },
+  favicon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAe0lEQVR42mNgGAWjgEjAxyPznxQ89B2AbqDTsRUkYYodNGAOQLcQHRCyGJd6oh0yYA7AFdQwQGxUEFKP0yGDzgGkZjtCeOg6AD1IyeUPXQeMpoGR6wBcBQupfKqXhDRzACGHkBvkFNeGdHfAaIuI2MYoueqGngNGwbAHAPpgQuExoryYAAAAAElFTkSuQmCC', // generated by tests/make-icons.js (jr)
+};
+
+// Which game: ?game=<id> (if that profile and theme exist), else the first matching
+// hostname rule, else CONFIG.defaultGame. Pure, so it can be tested with fake hosts.
+function selectGame(hostname, search, hosts = CONFIG.hosts) {
+  const q = new URLSearchParams(search || '').get('game');
+  if (q && PROFILES[q] && THEMES[q]) return q;
+  const hit = hosts.find(h => h.match.test(hostname || ''));
+  return hit ? hit.game : CONFIG.defaultGame;
+}
+{
+  const loc = typeof location === 'object' && location ? location : { hostname: '', search: '' };
+  CONFIG.game = selectGame(loc.hostname, loc.search);
+  CONFIG.profile = PROFILES[CONFIG.game];
+  CONFIG.theme = THEMES[CONFIG.game];
+}
+
 
 /* =====================================================================
  * 2. ENGINE
@@ -450,6 +587,7 @@ const CAMPAIGN = [
  * ===================================================================== */
 
 const Engine = (() => {
+  const PR = CONFIG.profile; // the rules of the selected game (see PROFILES)
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   const DIR_LIST = Object.values(DIRS);
   const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -468,7 +606,7 @@ const Engine = (() => {
       out.splice(i, 0, entry);
       return { list: out.slice(0, cap), rank: i < cap ? i : -1 };
     },
-    validName: n => typeof n === 'string' && n.length === 3 && [...n].every(ch => CONFIG.hiscores.alphabet.includes(ch)),
+    validName: n => typeof n === 'string' && n.length === 3 && [...n].every(ch => PR.hiscores.alphabet.includes(ch)),
     // Whatever came out of storage -> { [track]: table } for exactly `tracks`.
     sanitize(raw, tracks, cap) {
       const out = {};
@@ -487,14 +625,14 @@ const Engine = (() => {
 
   const state = {
     screen: 'title',      // title | attract | playing | paused | levelclear | entername | gameover
-    menuIndex: 0,         // selected title-menu entry (index into CONFIG.menu)
+    menuIndex: 0,         // selected title-menu entry (index into PR.menu)
     track: 'campaign',    // 'campaign' or a mode id (practice)
     stage: null,          // stageFor(track, level): resolved stage settings
     modeId: null,         // mode of the current stage
     params: null,         // current level params (after the mode's setup)
     level: 1,             // stage number within the track (1-based)
     score: 0,
-    lives: CONFIG.startLives,
+    lives: PR.startLives,
     cells: [],            // [{ value, eaten, fxT }], row-major; fxT = rewrite highlight
     remaining: 0,         // correct cells left on the board
     player: { col: 0, row: 0, chompT: 0 },
@@ -515,8 +653,8 @@ const Engine = (() => {
     // --- polish: stats, scores, settings, attract ---
     levelStats: { correct: 0, wrong: 0, ms: 0 }, // this stage, for the stage-clear banner
     events: [],           // queued event names, drained by the boot loop
-    hiscores: Hiscores.sanitize(null, CONFIG.menu, CONFIG.hiscores.perTrack), // { [track]: table }
-    initials: CONFIG.hiscores.defaultInitials, // last name entered (pre-fills the next entry)
+    hiscores: Hiscores.sanitize(null, PR.menu, PR.hiscores.perTrack), // { [track]: table }
+    initials: PR.hiscores.defaultInitials, // last name entered (pre-fills the next entry)
     entry: null,          // { initials:[a,b,c], pos } during name entry
     newEntry: null,       // { track, rank } of the entry just made (highlighted on game over)
     muted: !!CONFIG.sound.mutedByDefault,
@@ -535,43 +673,43 @@ const Engine = (() => {
   }
 
   const mode = () => MODES[state.modeId];
-  const idx = (c, r) => r * CONFIG.grid.cols + c;
-  const inGrid = (c, r) => c >= 0 && r >= 0 && c < CONFIG.grid.cols && r < CONFIG.grid.rows;
+  const idx = (c, r) => r * PR.grid.cols + c;
+  const inGrid = (c, r) => c >= 0 && r >= 0 && c < PR.grid.cols && r < PR.grid.rows;
   const isSafe = (c, r) => !!state.safe && state.safe.col === c && state.safe.row === r;
   const enemyAt = (c, r) => state.enemies.find(e => e.col === c && e.row === r);
-  const typeOf = e => ENEMY_TYPES[e.type];
+  const typeOf = e => PR.enemyTypes[e.type];
   const interval = t => t.tickMs * (state.enemyCfg.tickMult || 1);
 
   // ---------- campaign / practice tracks ----------
-  // A track is the list of stages one game plays: all of CAMPAIGN, or (practice)
-  // only the CAMPAIGN stages of one mode.
+  // A track is the list of stages one game plays: all of PR.campaign, or (practice)
+  // only the PR.campaign stages of one mode.
   function trackStages(track) {
-    const list = track === 'campaign' ? CAMPAIGN : CAMPAIGN.filter(st => st.mode === track);
-    if (!list.length) throw new Error(`No CAMPAIGN stages for track "${track}"`);
+    const list = track === 'campaign' ? PR.campaign : PR.campaign.filter(st => st.mode === track);
+    if (!list.length) throw new Error(`No PR.campaign stages for track "${track}"`);
     return list;
   }
-  const trackLabel = track => (track === 'campaign' ? 'Campaign' : `Practice: ${MODES[track].name}`);
+  const trackLabel = track => PR.trackNames[track] || track;
 
   // Resolved settings for stage `level` of a track. Pure: no randomness, no state.
   // Within the list: the stage as configured. Past the end (k = level - length):
-  // modes keep cycling through the list, difficulty follows CONFIG.escalation.
+  // modes keep cycling through the list, difficulty follows PR.escalation.
   function stageFor(track, level) {
     const list = trackStages(track), len = list.length;
     const withDefaults = e => ({ ...NO_ENEMIES, ...(e || {}) });
     if (level <= len) {
       const st = list[level - 1];
       return { modeId: st.mode, params: { ...st.params }, enemies: withDefaults(st.enemies),
-               safeCell: !!st.safeCell, safeDuration: CONFIG.safeCell.duration, rangeScale: 1, k: 0 };
+               safeCell: !!st.safeCell, safeDuration: PR.safeCell.duration, rangeScale: 1, k: 0 };
     }
-    const X = CONFIG.escalation, k = level - len;
+    const X = PR.escalation, k = level - len;
     const base = list[(k - 1) % len], last = withDefaults(list[len - 1].enemies), m = MODES[base.mode];
     const rangeScale = Math.min(X.rangeMax, 1 + X.rangeStep * k);
-    const lastTick = last.tickMult || 1, baseSafe = CONFIG.safeCell.duration;
+    const lastTick = last.tickMult || 1, baseSafe = PR.safeCell.duration;
     return {
       modeId: base.mode,
       params: m.widen ? m.widen({ ...base.params }, rangeScale) : { ...base.params },
       enemies: {
-        count: Math.min(CONFIG.enemies.maxOnScreen, last.count + Math.floor(k / X.extraEnemyEvery)),
+        count: Math.min(PR.enemies.maxOnScreen, last.count + Math.floor(k / X.extraEnemyEvery)),
         types: X.types,
         spawnDelay: last.spawnDelay || X.spawnDelay,
         tickMult: Math.max(Math.min(X.tickFloor, lastTick), lastTick * Math.pow(X.tickDecay, k)),
@@ -600,12 +738,12 @@ const Engine = (() => {
 
   // A fresh board's cells for mode m with params p (label is for error messages).
   function makeBoard(m, p, label) {
-    const { cols, rows } = CONFIG.grid;
+    const { cols, rows } = PR.grid;
     const total = cols * rows;
     const want = [];
-    for (let i = 0; i < total; i++) want.push(Math.random() < CONFIG.board.correctRatio);
+    for (let i = 0; i < total; i++) want.push(Math.random() < PR.board.correctRatio);
     let count = want.filter(Boolean).length;
-    const minC = Math.min(CONFIG.board.minCorrect, total);
+    const minC = Math.min(PR.board.minCorrect, total);
     while (count < minC) {
       const i = rnd(0, total - 1);
       if (!want[i]) { want[i] = true; count++; }
@@ -630,7 +768,7 @@ const Engine = (() => {
     const label = `${trackLabel(state.track)} stage ${state.level}`;
     state.cells = makeBoard(mode(), state.params, label);
     state.remaining = countRemaining();
-    const minC = Math.min(CONFIG.board.minCorrect, state.cells.length);
+    const minC = Math.min(PR.board.minCorrect, state.cells.length);
     if (state.remaining < minC) console.warn(`${label}: only ${state.remaining} correct cells (board.minCorrect is ${minC}); widen this stage's range`);
   }
 
@@ -639,26 +777,26 @@ const Engine = (() => {
   // board.minCorrect (or to zero), so a rewrite can't strand or end a level.
   function rewriteCell(i) {
     const cell = state.cells[i];
-    if (cell.eaten && !CONFIG.enemies.rewriteEaten) return;
+    if (cell.eaten && !PR.enemies.rewriteEaten) return;
     const m = mode(), p = state.params;
     const wasCorrect = !cell.eaten && m.isCorrect(cell.value, p);
-    const mustBeCorrect = wasCorrect && state.remaining - 1 < Math.max(1, CONFIG.board.minCorrect);
+    const mustBeCorrect = wasCorrect && state.remaining - 1 < Math.max(1, PR.board.minCorrect);
     const used = new Set();
     state.cells.forEach((c, j) => { if (!c.eaten || j === i) used.add(c.value); });
-    const want = mustBeCorrect || Math.random() < CONFIG.board.correctRatio;
+    const want = mustBeCorrect || Math.random() < PR.board.correctRatio;
     let v = uniqueValue(m, p, want, used);
     if (v === null && !mustBeCorrect) v = uniqueValue(m, p, !want, used);
     if (v === null) return; // range exhausted: leave the cell as it is
     cell.value = v;
     cell.eaten = false;
-    cell.fxT = CONFIG.timing.rewriteFlash;
+    cell.fxT = PR.timing.rewriteFlash;
     state.remaining = countRemaining();
   }
 
   // ---------- level flow ----------
   function centrePlayer() {
-    state.player.col = Math.floor(CONFIG.grid.cols / 2);
-    state.player.row = Math.floor(CONFIG.grid.rows / 2);
+    state.player.col = Math.floor(PR.grid.cols / 2);
+    state.player.row = Math.floor(PR.grid.rows / 2);
   }
 
   function startLevel() {
@@ -678,7 +816,7 @@ const Engine = (() => {
     state.safeOn = st.safeCell;
     state.safeDuration = st.safeDuration;
     state.safe = null;
-    state.safeT = CONFIG.safeCell.firstDelay;
+    state.safeT = PR.safeCell.firstDelay;
     state.levelStats = { correct: 0, wrong: 0, ms: 0 };
     state.screen = 'playing';
   }
@@ -687,7 +825,7 @@ const Engine = (() => {
     state.track = track;
     state.level = 1;
     state.score = 0;
-    state.lives = CONFIG.startLives;
+    state.lives = PR.startLives;
     state.newEntry = null;
     startLevel();
   }
@@ -696,8 +834,8 @@ const Engine = (() => {
   function move(dir) {
     const [dx, dy] = DIRS[dir];
     const p = state.player, before = idx(p.col, p.row);
-    p.col = Math.max(0, Math.min(CONFIG.grid.cols - 1, p.col + dx));
-    p.row = Math.max(0, Math.min(CONFIG.grid.rows - 1, p.row + dy));
+    p.col = Math.max(0, Math.min(PR.grid.cols - 1, p.col + dx));
+    p.row = Math.max(0, Math.min(PR.grid.rows - 1, p.row + dy));
     if (idx(p.col, p.row) !== before) emit('move');
     checkCollision();
   }
@@ -705,29 +843,29 @@ const Engine = (() => {
   function eat() {
     const p = state.player, i = idx(p.col, p.row), cell = state.cells[i];
     if (cell.eaten) return;
-    p.chompT = CONFIG.timing.chomp;
+    p.chompT = PR.timing.chomp;
     if (mode().isCorrect(cell.value, state.params)) {
       cell.eaten = true;
-      const pts = CONFIG.scoring.correct * state.level;
+      const pts = PR.scoring.correct * state.level;
       state.score += pts;
       state.remaining--;
       state.levelStats.correct++;
-      state.flash = { kind: 'good', t: CONFIG.timing.goodFlash, dur: CONFIG.timing.goodFlash, cell: i, msg: '+' + pts };
+      state.flash = { kind: 'good', t: PR.timing.goodFlash, dur: PR.timing.goodFlash, cell: i, msg: '+' + pts };
       emit('correct');
       if (state.remaining <= 0) {
-        state.lastBonus = CONFIG.scoring.levelBonus * state.level;
+        state.lastBonus = PR.scoring.levelBonus * state.level;
         state.score += state.lastBonus;
         state.screen = 'levelclear';
-        state.screenT = CONFIG.timing.levelClear;
+        state.screenT = PR.timing.levelClear;
         emit('clear');
       }
     } else {
       state.lives--;
       state.levelStats.wrong++;
       emit('wrong');
-      state.flash = { kind: 'bad', t: CONFIG.timing.wrongLock, dur: CONFIG.timing.wrongLock, cell: i,
+      state.flash = { kind: 'bad', t: PR.timing.wrongLock, dur: PR.timing.wrongLock, cell: i,
                       msg: mode().explain(cell.value, state.params) };
-      state.lockT = CONFIG.timing.wrongLock;
+      state.lockT = PR.timing.wrongLock;
       state.lockKind = 'wrong';
     }
   }
@@ -743,7 +881,7 @@ const Engine = (() => {
 
   // Same lockout pattern as a wrong eat, with its own timer and message.
   function die(e) {
-    const t = CONFIG.timing.deathLock;
+    const t = PR.timing.deathLock;
     state.lives--;
     state.lockT = t;
     state.lockKind = 'death';
@@ -771,18 +909,18 @@ const Engine = (() => {
   function finishGame() {
     const list = state.hiscores[state.track] || [];
     state.newEntry = null;
-    if (Hiscores.qualifies(list, state.score, CONFIG.hiscores.perTrack)) {
+    if (Hiscores.qualifies(list, state.score, PR.hiscores.perTrack)) {
       state.entry = { initials: [...state.initials], pos: 0 };
       state.screen = 'entername';
     } else {
       state.screen = 'gameover';
     }
-    state.screenT = CONFIG.timing.gameOverGuard;
+    state.screenT = PR.timing.gameOverGuard;
   }
 
   // Up/Down change the letter under the cursor, Left/Right move it, Space/Enter saves.
   function nameEntry(action, go) {
-    const e = state.entry, A = CONFIG.hiscores.alphabet;
+    const e = state.entry, A = PR.hiscores.alphabet;
     if (action === 'up' || action === 'down') {
       const i = Math.max(0, A.indexOf(e.initials[e.pos]));
       e.initials[e.pos] = A[(i + (action === 'up' ? 1 : A.length - 1)) % A.length];
@@ -793,23 +931,23 @@ const Engine = (() => {
     } else if (go) {
       const name = e.initials.join('');
       const res = Hiscores.insert(state.hiscores[state.track] || [], { name, score: state.score, stage: state.level },
-                                  CONFIG.hiscores.perTrack);
+                                  PR.hiscores.perTrack);
       state.hiscores = { ...state.hiscores, [state.track]: res.list };
       state.initials = name;
       state.newEntry = { track: state.track, rank: res.rank };
       state.entry = null;
       state.screen = 'gameover';
-      state.screenT = CONFIG.timing.gameOverGuard;
+      state.screenT = PR.timing.gameOverGuard;
       emit('save');
     }
   }
 
   // ---------- attract demo (title idle) ----------
   // Runs on its own board and Grumps in state.attract; the game fields are untouched.
-  const randomCell = () => ({ col: rnd(0, CONFIG.grid.cols - 1), row: rnd(0, CONFIG.grid.rows - 1) });
+  const randomCell = () => ({ col: rnd(0, PR.grid.cols - 1), row: rnd(0, PR.grid.rows - 1) });
   function startAttract() {
-    const A = CONFIG.attract, { cols, rows } = CONFIG.grid;
-    const level = rnd(1, CAMPAIGN.length);
+    const A = CONFIG.attract, { cols, rows } = PR.grid;
+    const level = rnd(1, PR.campaign.length);
     const st = stageFor('campaign', level), m = MODES[st.modeId];
     const params = m.setup ? m.setup(st.params, rnd) : st.params;
     const enemies = [];
@@ -819,7 +957,7 @@ const Engine = (() => {
       const row = onCol ? rnd(0, rows - 1) : MathUtil.pick([0, rows - 1], rnd);
       const type = MathUtil.pick(A.types, rnd);
       enemies.push({ id: -1 - i, type, col, row, dir: inwardDir(col, row),
-                     tickT: rnd(200, ENEMY_TYPES[type].tickMs), animT: rnd(0, 500) });
+                     tickT: rnd(200, PR.enemyTypes[type].tickMs), animT: rnd(0, 500) });
     }
     state.attract = { modeId: st.modeId, params, level, cells: makeBoard(m, params, 'attract demo'),
                       enemies, target: randomCell(), targetT: A.retargetMs, t: A.durationMs };
@@ -837,13 +975,13 @@ const Engine = (() => {
     a.targetT -= dt;
     if (a.targetT <= 0) { a.target = randomCell(); a.targetT = A.retargetMs; }
     // Stalkers chase a roaming invisible target; nobody rewrites numbers in the demo.
-    const w = { cols: CONFIG.grid.cols, rows: CONFIG.grid.rows, player: { ...a.target },
+    const w = { cols: PR.grid.cols, rows: PR.grid.rows, player: { ...a.target },
                 dirs: DIR_LIST.map(d => d.slice()), canEnter: inGrid, random: Math.random, rnd };
     for (const e of a.enemies) {
       e.animT += dt;
       e.tickT -= dt;
       if (e.tickT > 0) continue;
-      const t = ENEMY_TYPES[e.type];
+      const t = PR.enemyTypes[e.type];
       e.tickT += t.tickMs * A.tickMult;
       const d = t.move(e, w, t);
       if (d && w.canEnter(e.col + d[0], e.row + d[1])) { e.col += d[0]; e.row += d[1]; e.dir = [d[0], d[1]]; }
@@ -853,13 +991,13 @@ const Engine = (() => {
   // ---------- enemies ----------
   function inwardDir(c, r) {
     if (c === 0) return [1, 0];
-    if (c === CONFIG.grid.cols - 1) return [-1, 0];
+    if (c === PR.grid.cols - 1) return [-1, 0];
     if (r === 0) return [0, 1];
     return [0, -1];
   }
 
   function addEnemy(typeId, col, row, dir) {
-    const t = ENEMY_TYPES[typeId];
+    const t = PR.enemyTypes[typeId];
     if (!t) throw new Error(`Unknown enemy type "${typeId}"`);
     const e = { id: state.nextEnemyId++, type: typeId, col, row,
                 dir: dir || inwardDir(col, row), tickT: interval(t), animT: 0 };
@@ -868,10 +1006,10 @@ const Engine = (() => {
   }
 
   function spawnEnemy() {
-    const { cols, rows } = CONFIG.grid, p = state.player, cells = [];
+    const { cols, rows } = PR.grid, p = state.player, cells = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const edge = c === 0 || r === 0 || c === cols - 1 || r === rows - 1;
-      const far = Math.abs(c - p.col) + Math.abs(r - p.row) >= CONFIG.enemies.spawnMinDistance;
+      const far = Math.abs(c - p.col) + Math.abs(r - p.row) >= PR.enemies.spawnMinDistance;
       if (edge && far && !isSafe(c, r)) cells.push([c, r]);
     }
     if (!cells.length) return false;
@@ -884,7 +1022,7 @@ const Engine = (() => {
 
   function updateSpawns(dt) {
     const cfg = state.enemyCfg;
-    const cap = Math.min(cfg.count, CONFIG.enemies.maxOnScreen);
+    const cap = Math.min(cfg.count, PR.enemies.maxOnScreen);
     if (state.enemies.length >= cap || !cfg.types.length) return;
     state.spawnT -= dt;
     if (state.spawnT > 0) return;
@@ -893,7 +1031,7 @@ const Engine = (() => {
 
   function world() {
     return {
-      cols: CONFIG.grid.cols, rows: CONFIG.grid.rows,
+      cols: PR.grid.cols, rows: PR.grid.rows,
       player: { col: state.player.col, row: state.player.row },
       dirs: DIR_LIST.map(d => d.slice()),
       canEnter: (c, r) => inGrid(c, r) && !isSafe(c, r),
@@ -924,8 +1062,8 @@ const Engine = (() => {
   // ---------- safe cell ----------
   function placeSafe() {
     const free = [];
-    for (let r = 0; r < CONFIG.grid.rows; r++)
-      for (let c = 0; c < CONFIG.grid.cols; c++) if (!enemyAt(c, r)) free.push([c, r]);
+    for (let r = 0; r < PR.grid.rows; r++)
+      for (let c = 0; c < PR.grid.cols; c++) if (!enemyAt(c, r)) free.push([c, r]);
     if (!free.length) return; // retry next frame
     const [c, r] = free[rnd(0, free.length - 1)];
     state.safe = { col: c, row: r, t: state.safeDuration, dur: state.safeDuration };
@@ -936,7 +1074,7 @@ const Engine = (() => {
     if (!state.safeOn) return;
     if (state.safe) {
       state.safe.t -= dt;
-      if (state.safe.t <= 0) { state.safe = null; state.safeT = CONFIG.safeCell.cooldown; }
+      if (state.safe.t <= 0) { state.safe = null; state.safeT = PR.safeCell.cooldown; }
     } else {
       state.safeT -= dt;
       if (state.safeT <= 0) placeSafe();
@@ -954,10 +1092,10 @@ const Engine = (() => {
     switch (s.screen) {
       case 'title':
         if (action === 'up' || action === 'down') {
-          const n = CONFIG.menu.length;
+          const n = PR.menu.length;
           s.menuIndex = (s.menuIndex + (action === 'down' ? 1 : n - 1)) % n;
           emit('menu');
-        } else if (go) newGame(CONFIG.menu[s.menuIndex]);
+        } else if (go) newGame(PR.menu[s.menuIndex]);
         break;
       case 'entername': if (s.screenT <= 0) nameEntry(action, go); break;
       case 'gameover':
@@ -988,7 +1126,7 @@ const Engine = (() => {
     if (s.screen === 'playing') {
       tickCommon(dt);
       s.levelStats.ms += dt;
-      const frozen = s.lockT > 0 && (s.lockKind === 'death' || CONFIG.enemies.freezeDuringWrongEat);
+      const frozen = s.lockT > 0 && (s.lockKind === 'death' || PR.enemies.freezeDuringWrongEat);
       if (s.lockT > 0) {
         s.lockT -= dt;
         if (s.lockT <= 0) endLock();
@@ -1015,9 +1153,9 @@ const Engine = (() => {
   // ---------- persistence (data only; STORAGE does the I/O) ----------
   function loadSave(data) {
     const d = data || {};
-    state.hiscores = Hiscores.sanitize(d.hiscores, CONFIG.menu, CONFIG.hiscores.perTrack);
+    state.hiscores = Hiscores.sanitize(d.hiscores, PR.menu, PR.hiscores.perTrack);
     state.muted = typeof d.muted === 'boolean' ? d.muted : !!CONFIG.sound.mutedByDefault;
-    state.initials = Hiscores.validName(d.initials) ? d.initials : CONFIG.hiscores.defaultInitials;
+    state.initials = Hiscores.validName(d.initials) ? d.initials : PR.hiscores.defaultInitials;
   }
   const saveData = () => ({ hiscores: state.hiscores, muted: state.muted, initials: state.initials });
 
@@ -1045,16 +1183,17 @@ const Engine = (() => {
  * ===================================================================== */
 
 const Render = (() => {
-  const W = CONFIG.view.width, H = CONFIG.view.height, P = CONFIG.palette;
+  const PR = CONFIG.profile, TH = CONFIG.theme; // rules (grid, lives, ...) and look of the selected game
+  const W = CONFIG.view.width, H = CONFIG.view.height, P = TH.palette;
   const canvas = document.getElementById('screen');
   const ctx = canvas.getContext('2d');
   canvas.width = W; canvas.height = H;
 
-  // Layout (derived from grid size so CONFIG.grid can change)
+  // Layout (derived from the profile's grid size)
   const HEADER_H = 18, HUD_H = 22, MARGIN = 10;
-  const cellW = Math.floor((W - 2 * MARGIN) / CONFIG.grid.cols);
-  const cellH = Math.floor((H - HEADER_H - HUD_H - 4) / CONFIG.grid.rows);
-  const gridX = Math.floor((W - cellW * CONFIG.grid.cols) / 2);
+  const cellW = Math.floor((W - 2 * MARGIN) / PR.grid.cols);
+  const cellH = Math.floor((H - HEADER_H - HUD_H - 4) / PR.grid.rows);
+  const gridX = Math.floor((W - cellW * PR.grid.cols) / 2);
   const gridY = HEADER_H + 2;
 
   // ---- 5x7 bitmap font (original, each row is a 5-bit mask) ----
@@ -1134,70 +1273,14 @@ const Render = (() => {
 
   // ---- Original creature sprite ("the chomper"), 14x12 ----
   // o outline · b body · w eye white · k pupil/mouth · t tooth
-  const SPR_IDLE = [
-    '....oooooo....',
-    '..oobbbbbboo..',
-    '.obbbbbbbbbbo.',
-    '.obwwbbbbwwbo.',
-    'obbwkbbbbwkbbo',
-    'obbbbbbbbbbbbo',
-    'obbkbbbbbbkbbo',
-    'obbbkkkkkkbbbo',
-    '.obbbbbbbbbbo.',
-    '..oobbbbbboo..',
-    '...ooo..ooo...',
-  ];
-  const SPR_CHOMP = [
-    '....oooooo....',
-    '..oobbbbbboo..',
-    '.obwwbbbbwwbo.',
-    'obbwkbbbbwkbbo',
-    'obkkkkkkkkkkbo',
-    'obktktktktktbo',
-    'obkkkkkkkkkkbo',
-    'obkkkkkkkkkkbo',
-    'obbtktktktkbbo',
-    '.obbkkkkkkbbo.',
-    '..oobbbbbboo..',
-    '...ooo..ooo...',
-  ];
-  const SPR_DEAD = [ // X-eyes, shocked mouth
-    '....oooooo....',
-    '..oobbbbbboo..',
-    '.obkbkbbkbkbo.',
-    '.obbkbbbbkbbo.',
-    'obbkbkbbkbkbbo',
-    'obbbbbbbbbbbbo',
-    'obbbbbkkbbbbbo',
-    'obbbbkbbkbbbbo',
-    '.obbbbkkbbbbo.',
-    '..oobbbbbboo..',
-    '...ooo..ooo...',
-  ];
-
-  // ---- Original enemy sprite ("Grump"), 14x12, two-frame walk ----
-  // Left half is mirrored; c = body (per type colour), brows slope inward, eyes glare inward.
+  // ---- sprites: from the theme (theme.sprites) ----
+  const SPR_IDLE = TH.sprites.idle, SPR_CHOMP = TH.sprites.chomp, SPR_DEAD = TH.sprites.dead;
   const mirror = half => half.map(h => h + [...h].reverse().join(''));
-  const GRUMP_BODY = mirror([
-    '...oooo',
-    '..occcc',
-    '.occccc',
-    '.okkccc',
-    'occkkcc',
-    'occwkcc',
-    'occcccc',
-    'occkkkk',
-    'occktkt',
-    '.occccc',
-    '..ooooo',
-  ]);
-  const GRUMP = [
-    [...GRUMP_BODY, '.oo........oo.'], // feet apart
-    [...GRUMP_BODY, '...oo....oo...'], // feet together (drawn 1px higher = waddle)
-  ];
-  const SAFE_ICON = ['.ooo.', 'ooooo', 'ooooo', '.ooo.', '..o..'];
+  const GRUMP_BODY = mirror(TH.sprites.grumpHalf);
+  const GRUMP = TH.sprites.grumpFeet.map(feet => [...GRUMP_BODY, feet]); // two walk frames (2nd drawn 1px higher)
+  const SAFE_ICON = TH.sprites.safeIcon;
 
-  const creatureMap = hurt => ({ o: P.outline, b: hurt ? P.bodyHurt : P.body, w: P.eye, k: P.mouth, t: P.tooth });
+  const creatureMap = hurt => ({ o: P.outline, b: hurt ? P.bodyHurt : P.body, w: P.eye, k: P.mouth, t: P.tooth, p: P.cheek });
   const grumpMap = color => ({ o: P.outline, c: color, w: P.eye, k: P.mouth, t: P.tooth });
 
   // rows: array of strings; map: char -> colour (unmapped chars are transparent)
@@ -1236,7 +1319,7 @@ const Render = (() => {
 
   // Top-N table centred on cx. highlight = row index to flash (or -1).
   function drawTable(list, cx, y, rowH, highlight, t) {
-    for (let i = 0; i < CONFIG.hiscores.perTrack; i++) {
+    for (let i = 0; i < PR.hiscores.perTrack; i++) {
       const e = list[i], yy = y + i * rowH;
       const line = e ? `${i + 1} ${e.name} ${String(e.score).padStart(5, ' ')} S${e.stage}`
                      : `${i + 1} --- ${'-----'} ${'   '}`;
@@ -1249,29 +1332,30 @@ const Render = (() => {
 
   function drawTitle(s, t) {
     rect(0, 0, W, H, P.bg);
-    text(CONFIG.title, W / 2, 8, P.accent, 4, 'center');
-    text('Eat the right numbers!', W / 2, 40, P.dim, 1, 'center');
+    const TL = TH.titleLayout;
+    text(TH.title, W / 2, TL.titleY, P.accent, TL.titleScale, 'center');
+    text(TL.tagline, W / 2, TL.taglineY, P.dim, 1, 'center');
 
     // parade: the Chomper chomps across the screen with two Grumps in pursuit
-    const span = W + 56, ground = 79; // each sprite is off-screen for only ~7% of its loop
+    const span = W + 56, ground = TL.ground; // each sprite is off-screen for only ~7% of its loop
     const at = offset => Math.round(((t * 0.045 + offset) % span + span) % span) - 28;
     rect(0, ground + 1, W, 1, P.panel);
     const chomp = Math.floor(t / 180) % 2 === 0, cs = chomp ? SPR_CHOMP : SPR_IDLE;
     sprite(cs, at(0), ground - cs.length * 2 + 1 - (chomp ? 0 : 1), 2, creatureMap(false));
     [['wanderer', -46], ['stalker', -84]].forEach(([type, off], i) => {
       const f = Math.floor(t / 220 + i) % 2;
-      sprite(GRUMP[f], at(off), ground - GRUMP[f].length * 2 + 1 - f, 2, grumpMap(ENEMY_TYPES[type].color));
+      sprite(GRUMP[f], at(off), ground - GRUMP[f].length * 2 + 1 - f, 2, grumpMap(TH.grumpColors[type]));
     });
 
     // menu (left) + high scores for the selected track (right)
-    CONFIG.menu.forEach((id, i) => {
-      const y = 90 + i * 12, sel = i === s.menuIndex;
+    PR.menu.forEach((id, i) => {
+      const y = TL.menuY + i * TL.menuStep, sel = i === s.menuIndex;
       if (sel) { rect(4, y - 3, 182, 13, P.panel); text('>', 8, y, P.accent); }
       text(Engine.trackLabel(id), 16, y, sel ? P.accent : P.dim);
     });
     rect(190, 88, 1, 58, P.panel);
     text('High scores', 254, 90, P.dim, 1, 'center');
-    drawTable(s.hiscores[CONFIG.menu[s.menuIndex]] || [], 254, 102, 10, -1, t);
+    drawTable(s.hiscores[PR.menu[s.menuIndex]] || [], 254, 102, 10, -1, t);
 
     if (hints.touch) {
       if (Math.floor(t / 500) % 2 === 0) text('Tap a mode, then tap it again', W / 2, 158, P.accent, 1, 'center');
@@ -1296,13 +1380,13 @@ const Render = (() => {
 
     // grid
     const bad = v.flash && (v.flash.kind === 'bad' || v.flash.kind === 'dead');
-    const occupied = new Set(v.enemies.map(e => e.row * CONFIG.grid.cols + e.col));
-    if (v.player) occupied.add(v.player.row * CONFIG.grid.cols + v.player.col);
-    const safeVisible = v.safe && (v.safe.t > CONFIG.safeCell.blinkBefore || Math.floor(v.safe.t / 150) % 2 === 0);
+    const occupied = new Set(v.enemies.map(e => e.row * PR.grid.cols + e.col));
+    if (v.player) occupied.add(v.player.row * PR.grid.cols + v.player.col);
+    const safeVisible = v.safe && (v.safe.t > PR.safeCell.blinkBefore || Math.floor(v.safe.t / 150) % 2 === 0);
     const smallLabels = []; // drawn after the sprites so long expressions stay readable
-    for (let r = 0; r < CONFIG.grid.rows; r++) {
-      for (let c = 0; c < CONFIG.grid.cols; c++) {
-        const i = r * CONFIG.grid.cols + c, cell = v.cells[i];
+    for (let r = 0; r < PR.grid.rows; r++) {
+      for (let c = 0; c < PR.grid.cols; c++) {
+        const i = r * PR.grid.cols + c, cell = v.cells[i];
         const x = gridX + c * cellW, y = gridY + r * cellH;
         const flashing = v.flash && v.flash.cell === i;
         const safeHere = safeVisible && v.safe.col === c && v.safe.row === r;
@@ -1323,7 +1407,7 @@ const Render = (() => {
         }
       }
     }
-    frame(gridX - 1, gridY - 1, cellW * CONFIG.grid.cols + 2, cellH * CONFIG.grid.rows + 2, bad ? P.bad : P.cellEdge);
+    frame(gridX - 1, gridY - 1, cellW * PR.grid.cols + 2, cellH * PR.grid.rows + 2, bad ? P.bad : P.cellEdge);
 
     // enemies (a Grump sharing the player's cell shifts left so both show)
     const sw = 14 * 2;
@@ -1332,7 +1416,7 @@ const Render = (() => {
       const f = Math.floor(e.animT / 250) % 2, spr = GRUMP[f];
       const withPlayer = v.player && e.col === v.player.col && e.row === v.player.row;
       const x = withPlayer ? ex + 3 : ex + cellW - sw - 3;
-      sprite(spr, x, ey + cellH - spr.length * 2 - 1 - f, 2, grumpMap(ENEMY_TYPES[e.type].color));
+      sprite(spr, x, ey + cellH - spr.length * 2 - 1 - f, 2, grumpMap(TH.grumpColors[e.type]));
     }
 
     // player
@@ -1361,7 +1445,7 @@ const Render = (() => {
     // "+points" pop
     if (v.flash && v.flash.kind === 'good') {
       const k = 1 - v.flash.t / v.flash.dur;
-      const fc = v.flash.cell % CONFIG.grid.cols, fr = Math.floor(v.flash.cell / CONFIG.grid.cols);
+      const fc = v.flash.cell % PR.grid.cols, fr = Math.floor(v.flash.cell / PR.grid.cols);
       text(v.flash.msg, gridX + fc * cellW + cellW / 2, gridY + fr * cellH - Math.round(k * 10), P.good, 1, 'center');
     }
 
@@ -1373,7 +1457,7 @@ const Render = (() => {
     } else {
       text('Score ' + String(v.score).padStart(5, '0'), MARGIN, hudY + 8, P.number);
       if (v.muted) text('Muted', W / 2, hudY + 8, P.dim, 1, 'center');
-      for (let i = 0; i < CONFIG.startLives; i++) {
+      for (let i = 0; i < PR.startLives; i++) {
         const x = W - MARGIN - 14 - i * 17;
         if (i < v.lives) sprite(SPR_IDLE, x, hudY + 5, 1, creatureMap(false));
         else frame(x + 3, hudY + 8, 8, 6, P.cellEdge);
@@ -1383,12 +1467,16 @@ const Render = (() => {
     // wrong-eat / death message
     if (dying) {
       // keep the death animation visible: banner goes in the half of the grid the player isn't in
-      const top = v.player.row >= Math.floor(CONFIG.grid.rows / 2);
-      banner([{ s: v.flash.msg, color: P.bad }], P.bad, gridY + cellH * (top ? 1 : CONFIG.grid.rows - 1));
-    } else if (bad) banner([{ s: v.flash.msg, color: P.bad }], P.bad);
+      const top = v.player.row >= Math.floor(PR.grid.rows / 2);
+      const msg = TH.deathText ? TH.deathText(v.flash.msg) : v.flash.msg;
+      banner([{ s: msg, color: P.bad }], P.bad, gridY + cellH * (top ? 1 : PR.grid.rows - 1));
+    } else if (bad) {
+      const msg = TH.wrongText ? TH.wrongText(v.flash.msg) : v.flash.msg;
+      banner([{ s: msg, color: P.bad }], P.bad);
+    }
 
-    // death screen flash (CONFIG.feel)
-    const F = CONFIG.feel;
+    // death screen flash (profile.feel)
+    const F = PR.feel;
     if (dying && F.deathFlash) {
       const age = v.flash.dur - v.flash.t;
       if (age < F.deathFlashMs) {
@@ -1486,7 +1574,7 @@ const Render = (() => {
   //   other screens: { kind: 'screen' } (a tap anywhere)
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function hitTest(s, x, y) {
-    const { cols, rows } = CONFIG.grid;
+    const { cols, rows } = PR.grid;
     switch (s.screen) {
       case 'playing': {
         const gw = cellW * cols, gh = cellH * rows;
@@ -1494,12 +1582,14 @@ const Render = (() => {
         return { kind: 'cell', col: clamp(Math.floor((x - gridX) / cellW), 0, cols - 1),
                  row: clamp(Math.floor((y - gridY) / cellH), 0, rows - 1) };
       }
-      case 'title':
-        for (let i = 0; i < CONFIG.menu.length; i++) {
-          const y0 = 90 + i * 12 - 3;
-          if (x < 190 && y >= y0 && y < y0 + 12) return { kind: 'menu', index: i };
+      case 'title': {
+        const TL = TH.titleLayout;
+        for (let i = 0; i < PR.menu.length; i++) {
+          const y0 = TL.menuY + i * TL.menuStep - 3;
+          if (x < 190 && y >= y0 && y < y0 + TL.menuStep) return { kind: 'menu', index: i };
         }
         return null;
+      }
       case 'entername': {
         const pitch = 30, x0 = W / 2 - pitch;
         for (let i = 0; i < s.entry.initials.length; i++) {
@@ -1527,9 +1617,12 @@ const Render = (() => {
  *    noise buffer at play time. No sample files. Browsers only allow audio
  *    after a user gesture, so INPUT calls Sound.unlock() on key/pointer down.
  *    Volume and default mute live in CONFIG.sound; M toggles mute (saved).
+ *    The theme's sound.pitch multiplies every frequency and sound.tempo speeds
+ *    everything up (durations and delays are divided by it).
  * ===================================================================== */
 
 const Sound = (() => {
+  const { pitch, tempo } = CONFIG.theme.sound;
   let ac = null, master = null, noiseBuf = null;
   let muted = !!CONFIG.sound.mutedByDefault;
   const stats = { unlocked: false, played: 0 };
@@ -1551,6 +1644,7 @@ const Sound = (() => {
 
   // One oscillator note: wave type, start/end frequency (Hz), length (s), peak volume, delay (s).
   function tone(type, f0, f1, dur, vol, at = 0) {
+    f0 *= pitch; f1 *= pitch; dur /= tempo; at /= tempo;
     const t0 = ac.currentTime + at;
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type;
@@ -1565,6 +1659,7 @@ const Sound = (() => {
 
   // A burst of band-passed noise (crunches, thuds).
   function noise(dur, vol, freq, at = 0) {
+    freq *= pitch; dur /= tempo; at /= tempo;
     if (!noiseBuf) {
       noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.5), ac.sampleRate);
       const d = noiseBuf.getChannelData(0);
@@ -1605,13 +1700,14 @@ const Sound = (() => {
 
 /* =====================================================================
  * 5. STORAGE
- *    One versioned localStorage entry (CONFIG.storage) holding the
- *    Engine.saveData() object: high scores, mute, last initials.
+ *    One versioned localStorage entry per game (profile.storageKey, shape
+ *    version CONFIG.storage.version) holding Engine.saveData() (high scores,
+ *    mute, last initials) plus the touch mode.
  *    Unreadable, foreign-version or missing data loads as "nothing saved".
  * ===================================================================== */
 
 const Storage = (() => {
-  const { key, version } = CONFIG.storage;
+  const key = CONFIG.profile.storageKey, version = CONFIG.storage.version;
   function load() {
     try {
       const raw = window.localStorage.getItem(key);
@@ -1650,7 +1746,7 @@ const Input = (() => {
     KeyM: 'mute',
   };
   const REPEATABLE = new Set(['up', 'down', 'left', 'right']);
-  const T = CONFIG.touch, P = CONFIG.palette, VW = CONFIG.view.width, VH = CONFIG.view.height;
+  const T = CONFIG.touch, P = CONFIG.theme.palette, VW = CONFIG.view.width, VH = CONFIG.view.height;
   const canvas = Render.canvas, footer = document.getElementById('footer');
 
   function emit(action) { Engine.handle(action); }
@@ -1699,7 +1795,7 @@ const Input = (() => {
       }
       case 'title': {
         if (hit.index === s.menuIndex) { emit('confirm'); return; }
-        const n = CONFIG.menu.length, d = (hit.index - s.menuIndex + n) % n;
+        const n = CONFIG.profile.menu.length, d = (hit.index - s.menuIndex + n) % n;
         const dir = d <= n / 2 ? 'down' : 'up';
         for (let k = Math.min(d, n - d); k > 0; k--) emit(dir);
         return;
@@ -1951,7 +2047,28 @@ const Input = (() => {
 
 
 /* ---- boot + main loop ---- */
-document.title = CONFIG.title;
+// Page chrome from the theme: title, colours, icons, footer.
+{
+  const TH = CONFIG.theme, head = document.head;
+  const meta = (name, content) => {
+    let m = head.querySelector(`meta[name="${name}"]`);
+    if (!m) { m = document.createElement('meta'); m.name = name; head.appendChild(m); }
+    m.content = content;
+  };
+  const link = (rel, href) => {
+    let l = head.querySelector(`link[rel="${rel}"]`);
+    if (!l) { l = document.createElement('link'); l.rel = rel; head.appendChild(l); }
+    l.href = href;
+    return l;
+  };
+  document.title = TH.title;
+  meta('theme-color', TH.palette.panel);
+  meta('apple-mobile-web-app-title', TH.title);
+  link('icon', TH.favicon).type = 'image/png';
+  link('apple-touch-icon', TH.icons[192]);
+  document.getElementById('footer').textContent = TH.footer;
+  document.body.style.background = TH.palette.pageBg || '';
+}
 const saved = Storage.load();
 Engine.loadSave(saved);
 Input.setTouchMode(saved && saved.touchMode);
@@ -1959,7 +2076,9 @@ Sound.setMuted(Engine.state.muted);
 // Saved settings = the engine's data (scores, mute, initials) + the touch layer's mode.
 const saveAll = () => Storage.save({ ...Engine.saveData(), touchMode: Input.touchMode() });
 Input.onSettingsChanged(saveAll);
-window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Render, Input, Sound, Storage };
+window.Chompers = { CONFIG, MODES, MathUtil, PROFILES, THEMES, selectGame,
+                    CAMPAIGN: CONFIG.profile.campaign, ENEMY_TYPES: CONFIG.profile.enemyTypes,
+                    Engine, Render, Input, Sound, Storage };
 Input.layout();
 Render.canvas.focus();
 
@@ -1970,7 +2089,7 @@ function handleEvents() {
     if (ev === 'save') { saveAll(); continue; }
     if (ev === 'mute') { Sound.setMuted(Engine.state.muted); saveAll(); Sound.play('menu'); continue; }
     Sound.play(ev);
-    if (ev === 'correct' && CONFIG.feel.hitStop) hitStop = CONFIG.feel.hitStopFrames;
+    if (ev === 'correct' && CONFIG.profile.feel.hitStop) hitStop = CONFIG.profile.feel.hitStopFrames;
   }
 }
 
@@ -1978,7 +2097,7 @@ function handleEvents() {
 function step(dt) {
   handleEvents();                       // events from key presses since the last frame
   let ran = true;
-  if (hitStop > 0) { hitStop--; ran = false; } // CONFIG.feel.hitStop
+  if (hitStop > 0) { hitStop--; ran = false; } // profile.feel.hitStop
   else Engine.update(dt);
   handleEvents();                       // events from this update (spawns, deaths, ...)
   return ran;
@@ -1996,15 +2115,17 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-// PWA: manifest + offline service worker, only when served over http(s).
-// Opening chompers.html straight from disk works exactly as before.
+// PWA: the theme's manifest + an offline service worker for this game, only when
+// served over http(s). Opening chompers.html straight from disk works as before.
 if (/^https?:$/.test(location.protocol)) {
+  const TH = CONFIG.theme;
   const link = document.createElement('link');
   link.rel = 'manifest';
-  link.href = 'manifest.json';
+  link.href = TH.manifest;
   document.head.appendChild(link);
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=' + encodeURIComponent(CONFIG.version), { updateViaCache: 'none' })
+    const q = new URLSearchParams({ v: CONFIG.version, cache: TH.cacheName, manifest: TH.manifest });
+    navigator.serviceWorker.register('sw.js?' + q, { updateViaCache: 'none' })
       .catch(err => console.warn('Service worker not registered:', err));
   }
 }
