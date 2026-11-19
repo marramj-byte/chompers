@@ -49,6 +49,20 @@ touch-emulated Chromium contexts at phone landscape (844×390), phone portrait (
 - **Shared** (`CONFIG`): `version`, `view`, `sound` volume and default mute, `attract`, `touch`, `storage.version`, `hosts`. Also shared: `MODES` (the math rules; a profile's stages pick which it uses), `MathUtil` and `MOVES` (Grump movement functions that kits point at).
 - **Saves:** each game saves under its own localStorage key (`profile.storageKey`: `chompers.v1`, `chompersjr.v1`), so scores and settings never mix.
 
+### Chompers Jr (`PROFILES.jr`, `THEMES.jr`)
+- **Rules:**
+  - 5×4 board, 5 lives, wrong-eat lockout 900 ms, no death flash, hit-stop on.
+  - `JR_CAMPAIGN` has 11 gentle stages: ×2 to 20, ×10, ×5, equal-to with `+` (operands ≤ 10), ×2 to 40, less-than with plain numbers, equal-to with `+`/`−` (≤ 12), greater-than with plain numbers, ×3, equal-to with `+`/`−` (≤ 15), primes to 20. There's no factors mode.
+  - Grumps: at most one slow Wanderer per stage (from stage 3). Stalkers appear only in escalation, with `randomStepChance` 0.6. The safe cell is on every stage and lasts 12 s.
+  - Escalation uses the same formula with gentler numbers: `rangeStep` 0.05, `rangeMax` 2, a Grump added every 6 stages up to 3, `tickFloor` 0.7, `safeFloor` 6 s.
+  - Names: `hiscores.presets` replaces letter entry with picking a ready-made name (YOU, ACE, BOO, …). The top-5 tables are kept.
+  - Title menu: Adventure plus practice for multiples, equal/less/more and primes.
+- **Look:**
+  - Warm plum palette with a soft coral "wrong" colour.
+  - Original rounder, big-eyed Chompy with rosy cheeks (`p` in the sprite → `palette.cheek`), friendlier Grumplets, and a dizzy (not scary) caught sprite.
+  - Sounds ×1.12 pitch and ×1.25 speed.
+  - `wrongText` turns "9 is not a multiple of 2" into "9 isn't a multiple of 2 — try again!", and `deathText` shows "Oops! A Grumplet bumped you!".
+
 ### How to add a game (profile + theme)
 1. **Pick an id**, e.g. `kids2`.
 2. **Profile:** add `PROFILES.kids2`. Start from an existing profile and change values. Give it its own `storageKey`. List its tracks in `menu` / `trackNames`, using only modes that appear in its `campaign`.
@@ -79,19 +93,19 @@ touch-emulated Chromium contexts at phone landscape (844×390), phone portrait (
 
     Over http(s), the boot code also adds the theme's manifest link and registers the service worker.
 - **Rendering:** canvas at a fixed logical resolution of 320×200, scaled up by an integer factor to fit the window (`image-rendering: pixelated`). Text uses a built-in 5×7 bitmap font so it stays crisp. The grid's cell size follows the profile's `grid`.
-- **Controls:** arrows / WASD move, Space eats (also starts / continues), Esc pauses, M toggles sound (saved). On the title screen Up/Down choose Campaign or a practice mode (`profile.menu`). For high-score initials, Up/Down change the letter, Left/Right move between letters and Space saves. Window blur auto-pauses.
+- **Controls:** arrows / WASD move, Space eats (also starts / continues), Esc pauses, M toggles sound (saved). On the title screen Up/Down choose Campaign or a practice mode (`profile.menu`). For high-score initials, Up/Down change the letter, Left/Right move between letters and Space saves. A profile with `hiscores.presets` instead picks one of those names with any arrow. Window blur auto-pauses.
 - **Touch** (`CONFIG.touch`):
   - The touch UI appears on coarse-pointer devices or after the first touch. Mouse input is unchanged: a click never moves or eats.
   - **Moving:** tap a cell and the Chomper walks there one cell per `stepMs`, along a shortest Manhattan path (longer axis first). A new tap, a key, a pad button or EAT cancels the walk, and so does a lockout. Tapping the Chomper's own cell eats. Taps up to half a cell outside the grid, even just beside the canvas, count as the nearest cell. Taps during a lockout are ignored.
   - **Buttons:** EAT (≥ 56 px, corner set by `eatSide`), pause opposite it, and an optional D-pad (four 56 px buttons, hold to repeat).
   - **Title toggles:** TOUCH: TAP / PAD and SOUND. The touch mode is saved as `touchMode` in the same storage entry, merged in by the boot code's `saveAll`.
-  - **Menus by tap:** tap a menu row to select it, tap again to start. Name entry has an arrow above and below each letter plus a SAVE box. Game over and pause respond to a tap anywhere.
+  - **Menus by tap:** tap a menu row to select it, tap again to start. Name entry has an arrow above and below each letter (or above and below the name, for presets) plus a SAVE box. Game over and pause respond to a tap anywhere.
 - **Layout** (`layout()` in INPUT): the canvas gets the largest whole-number scale that leaves room for the buttons, and buttons are never placed over the canvas.
   - **`plain`:** no touch UI; the desktop look.
   - **`side`:** landscape. EAT and the title toggles go in one side column, pause and the D-pad in the other.
   - **`bottom`:** portrait, or landscape when it gives a bigger scale (tablets). Buttons sit in a row under the canvas.
   - Safe-area insets are respected. The page never scrolls or zooms: viewport meta, `touch-action: none`, and preventDefault on touch and gesture events. In portrait, a "rotate for best play" hint shows until tapped or for `rotateHintMs`.
-- **Modes** are entries in `MODES` (in CONFIG, shared by all games) with four required functions: `title` (header), `isCorrect`, `makeValue` (generator; may return `null`, the engine retries), `explain` (wrong-eat message). Optional: `name`, `setup(p, rnd)` (turns stage params into concrete params once per level, e.g. picking N from `ns`) and `widen(p, f)` (ranges scaled by f for escalation). Current modes: `multiples`, `factors`, `primes`, `equals` (variants `eq` / `lt` / `gt`). Adding a mode needs a `MODES` entry plus stages in a profile's `campaign` (and `menu` / `trackNames` entries for practice), with no engine changes. Wanderer rewrites call the mode's own `makeValue`.
+- **Modes** are entries in `MODES` (in CONFIG, shared by all games) with four required functions: `title` (header), `isCorrect`, `makeValue` (generator; may return `null`, the engine retries), `explain` (wrong-eat message). Optional: `name`, `setup(p, rnd)` (turns stage params into concrete params once per level, e.g. picking N from `ns`) and `widen(p, f)` (ranges scaled by f for escalation). Current modes: `multiples`, `factors`, `primes`, `equals` (variants `eq` / `lt` / `gt`; with `plain: true` its cells are plain numbers from the operand range instead of expressions). Adding a mode needs a `MODES` entry plus stages in a profile's `campaign` (and `menu` / `trackNames` entries for practice), with no engine changes. Wanderer rewrites call the mode's own `makeValue`.
 - **Cell values** are numbers or short expression strings (`"3+9"`, `"4×3"`, `"15−3"`, `"24÷2"`, using the Unicode `−`, `×`, `÷`). Uniqueness is by displayed text. Cell text is at most `profile.board.maxChars` (6) characters. Text of up to 3 characters uses the normal 5×7 font; anything longer uses the condensed 3×7 digit/operator font, for both the big centred label and the small label under the player or a Grump. `MathUtil` holds the shared helpers (`isPrime`, `factors`, `evalExpr`).
 - **Enemies ("Grumps")** come from the profile's Grump kit, `profile.enemyTypes`: `{ name, tickMs, altersNumbers, move, ...tunables }`, where `move` is one of the shared `MOVES` (`wander`, `stalk`). `move` returns a direction and only sees a small `world` object (grid size, player position, `canEnter`, rng), so new types need no engine changes. Colours come from `theme.grumpColors`. Per-stage enemy settings (`enemies: { count, types, spawnDelay, tickMult }`, `safeCell`) live in the campaign stages; global caps and timings live in the profile's `enemies`, `safeCell` and `timing`.
 - **Time** only advances in `Engine.update`, and only the `playing` screen ticks enemies, spawns and the safe cell, so pause freezes everything. Lockouts (wrong eat, death) share one `lockT` / `lockKind` mechanism.
@@ -106,7 +120,7 @@ touch-emulated Chromium contexts at phone landscape (844×390), phone portrait (
 - **`profile.campaign`** is an array of stages, one per level, played in order: `{ mode, params, enemies, safeCell }`. Modes rotate, and each mode's first stage is its gentlest. The regular campaign (`REGULAR_CAMPAIGN`) has 22 stages.
 - A **track** is the list of stages a game plays. `'campaign'` is the whole campaign. Practice (a mode id) is only that mode's campaign stages, in campaign order. `Engine.stageFor(track, level)` resolves a stage purely, with no randomness.
 - **Past the last stage of a track the game does not loop.** With `k = level − trackLength` (1, 2, 3, …), the mode and params come from `track[(k − 1) mod trackLength]`, so modes keep cycling. The difficulty comes from the profile's `escalation`, where "last" is the track's final stage:
-  - range scale `f = min(rangeMax, 1 + rangeStep·k)`, passed to the mode's `widen(p, f)`. Multiples, factors and primes scale `max`, capped at `maxNumber` (999 regular). Equals scales the top of the operand range (capped at `maxOperand`, 99 regular) and, for less-than and greater-than, the target N.
+  - range scale `f = min(rangeMax, 1 + rangeStep·k)`, passed to the mode's `widen(p, f)`. Multiples, factors and primes scale `max`, capped at `maxNumber` (999 regular, 120 jr). Equals scales the top of the operand range (capped at `maxOperand`, 99 regular, 40 jr) and, for less-than and greater-than, the target N. A cap never shrinks a stage's own range, and when a cap applies, N scales with the range that's really there.
   - Grumps `= min(enemies.maxOnScreen, last.count + floor(k / extraEnemyEvery))`
   - `tickMult = max(min(tickFloor, last.tickMult), last.tickMult · tickDecay^k)`
   - safe cell is always on and lasts `max(min(safeFloor, safeCell.duration), safeCell.duration · safeDecay^k)` ms

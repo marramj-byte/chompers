@@ -55,6 +55,9 @@ function pageHelpers() {
     invalid(id, v, p) {
       const { CONFIG } = Chompers;
       if (String(v).length > CONFIG.profile.board.maxChars) return `"${v}" longer than ${CONFIG.profile.board.maxChars}`;
+      if (id === 'equals' && p.plain) {
+        return Number.isInteger(v) && v >= p.operand[0] && v <= p.operand[1] ? null : `${v} outside ${p.operand}`;
+      }
       if (id === 'equals') {
         const m = /^(\d+)([+−×÷])(\d+)$/.exec(v);
         if (typeof v !== 'string' || !m) return `"${v}" is not an expression`;
@@ -926,6 +929,171 @@ function pageHelpers() {
   check(asRegular.footer === DISCLAIMER && asJr.footer === DISCLAIMER, 'both games keep the disclaimer footer');
   await page.evaluate(() => localStorage.clear());
 
+  // ===================== Chompers Jr =====================
+  console.log('-- chompers jr');
+  const JR = URL + '?game=jr';
+  await page.goto(JR); await page.waitForTimeout(150);
+  await shot('20-jr-title');
+  const jr = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, PR = CONFIG.profile;
+    E.debug.gotoLevel(1);
+    const describe = st => {
+      const p = st.params;
+      if (st.mode === 'multiples') return `x${p.n}<=${p.max}`;
+      if (st.mode === 'primes') return `primes<=${p.max}`;
+      return `${p.variant}${p.plain ? ' plain' : ' ' + p.ops.join('')}${p.plain ? '' : ' ops<=' + p.operand[1]}`;
+    };
+    return { grid: PR.grid, lives: E.state.lives, menu: PR.menu, stages: PR.campaign.map(describe),
+             title: document.title, cols: E.state.cells.length };
+  });
+  const SPEC = ['x2<=20', 'x10<=100', 'x5<=50', 'eq + ops<=10', 'x2<=40', 'lt plain', 'eq +− ops<=12', 'gt plain',
+                'x3<=30', 'eq +− ops<=15', 'primes<=20'];
+  check(jr.title === 'Chompers Jr' && jr.grid.cols === 5 && jr.grid.rows === 4 && jr.cols === 20 && jr.lives === 5,
+        `jr: "${jr.title}", ${jr.grid.cols}x${jr.grid.rows} board, ${jr.lives} lives`);
+  check(JSON.stringify(jr.stages) === JSON.stringify(SPEC), `jr stages as specified: ${jr.stages.join(' | ')}`);
+  check(jr.menu.join() === 'campaign,multiples,equals,primes', `jr title menu: Adventure + practice for jr modes only (${jr.menu.join(', ')}; no factors)`);
+
+  const jrBoards = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, PR = CONFIG.profile, out = { boards: 0, problems: [], minCorrect: Infinity };
+    for (const track of PR.menu) {
+      const len = E.trackStages(track).length;
+      const levels = [...Array.from({ length: len }, (_, i) => [i + 1, 200]),
+                      ...Array.from({ length: len }, (_, i) => [len + i + 1, 50]), [len + 20, 50], [len + 40, 50]];
+      for (const [L, times] of levels) for (let k = 0; k < times; k++) {
+        E.debug.gotoLevel(L, track); out.boards++;
+        out.minCorrect = Math.min(out.minCorrect, E.state.remaining);
+        const bad = T.boardProblem();
+        if (bad && out.problems.length < 3) out.problems.push(`${track} ${L}: ${bad}`);
+      }
+    }
+    out.floor = PR.board.minCorrect;
+    return out;
+  });
+  check(jrBoards.problems.length === 0 && jrBoards.minCorrect >= jrBoards.floor,
+        `jr: ${jrBoards.boards} boards (200 per stage per track + escalated) unique, in range, >= ${jrBoards.floor} correct` + (jrBoards.problems.length ? ' ' + JSON.stringify(jrBoards.problems) : ''));
+
+  const jrRules = await page.evaluate(() => {
+    const { CONFIG, Engine: E, PROFILES } = Chompers, PR = CONFIG.profile, RG = PROFILES.regular;
+    const stageGrumps = PR.campaign.map(st => st.enemies ? st.enemies : { count: 0, types: [] });
+    const len = PR.campaign.length, esc = [], problems = [];
+    let prev = E.stageFor('campaign', len);
+    for (let k = 1; k <= 80; k++) {
+      const cur = E.stageFor('campaign', len + k);
+      if (cur.enemies.count < prev.enemies.count || cur.enemies.tickMult > prev.enemies.tickMult
+          || cur.safeDuration > prev.safeDuration || cur.rangeScale < prev.rangeScale) problems.push(k);
+      esc.push(cur); prev = cur;
+    }
+    return {
+      maxPerStage: Math.max(...stageGrumps.map(e => e.count)),
+      stageTypes: [...new Set(stageGrumps.flatMap(e => e.types))],
+      escTypes: [...new Set(esc.flatMap(st => st.enemies.types))],
+      allSafe: PR.campaign.every(st => st.safeCell) && esc.every(st => st.safeCell),
+      safeMs: PR.safeCell.duration, regularSafeMs: RG.safeCell.duration,
+      slowWanderer: PR.enemyTypes.wanderer.tickMs > RG.enemyTypes.wanderer.tickMs,
+      stalkerRandom: PR.enemyTypes.stalker.randomStepChance,
+      lock: PR.timing.wrongLock, regularLock: RG.timing.wrongLock,
+      feel: PR.feel, monotone: problems,
+      // compare with the regular escalation at the same distance past the end
+      esc: esc.slice(0, 40).map(st => ({ n: st.enemies.count, tick: st.enemies.tickMult, safe: st.safeDuration, range: st.rangeScale })),
+    };
+  });
+  const regSnap = JSON.parse(regularThen).stages.campaign.slice(22);   // regular stages 23..62 = k 1..40
+  const gentler = jrRules.esc.every((j, i) => {
+    const r = regSnap[i];
+    return j.n <= r.enemies.count && j.tick * 1600 >= r.enemies.tickMult * 1040 && j.safe >= r.safeDuration && j.range <= r.rangeScale;
+  });
+  check(jrRules.maxPerStage <= 1 && jrRules.stageTypes.join() === 'wanderer' && jrRules.slowWanderer,
+        'jr stages: at most one Grump, always a (slower) Wanderer');
+  check(jrRules.escTypes.includes('stalker') && jrRules.stalkerRandom >= 0.5,
+        `jr Stalkers only appear in escalation, and wander a lot (randomStepChance ${jrRules.stalkerRandom})`);
+  check(jrRules.allSafe && jrRules.safeMs >= 2 * jrRules.regularSafeMs, `jr safe cell on every stage, lasting ${jrRules.safeMs / 1000} s`);
+  check(jrRules.monotone.length === 0 && gentler,
+        'jr escalation never eases and is slower and shallower than regular at every step (fewer Grumps, slower, longer safe cell, narrower ranges)');
+  check(jrRules.lock < jrRules.regularLock && jrRules.feel.deathFlash === false && jrRules.feel.hitStop === true,
+        `jr feel: wrong-eat lockout ${jrRules.lock} ms (regular ${jrRules.regularLock}), no death flash, hit-stop on`);
+
+  // friendlier wrong-eat message, shorter lockout, softer colour, no death flash
+  const jrMsg = await page.evaluate(() => {
+    const { CONFIG, Engine: E, MODES, Render } = Chompers, s = E.state, TH = CONFIG.theme;
+    E.debug.gotoLevel(1); s.spawnT = 1e9;
+    const m = E.mode(), i = s.cells.findIndex(c => !m.isCorrect(c.value, s.params));
+    E.debug.placePlayer(i % 5, Math.floor(i / 5)); E.handle('eat');
+    const shown = TH.wrongText(s.flash.msg), lock = s.lockT;
+    const plain = TH.wrongText(MODES.equals.explain(12, { variant: 'lt', n: 10 }));
+    const expr = TH.wrongText(MODES.equals.explain('4+3', { variant: 'eq', n: 10 }));
+    const prime = TH.wrongText(MODES.primes.explain(9));
+    // death: draw its first frame and sample a background pixel
+    T.sim(CONFIG.profile.timing.wrongLock + 50);
+    s.enemies = []; E.debug.setSafe(null, null, 1e9);
+    const g = E.debug.spawn('wanderer', s.player.col + (s.player.col < 4 ? 1 : -1), s.player.row); g.tickT = 1e9;
+    E.handle(s.player.col < 4 ? 'right' : 'left');
+    Render.draw(s, performance.now());
+    const px = Array.from(document.getElementById('screen').getContext('2d').getImageData(2, 100, 1, 1).data.slice(0, 3));
+    return { shown, lock, plain, expr, prime, death: TH.deathText(s.flash.msg), deathKind: s.flash.kind, px, bg: TH.palette.bg, bad: TH.palette.bad };
+  });
+  check(/^\d+ isn't a multiple of 2 — try again!$/.test(jrMsg.shown) && jrMsg.lock === 900,
+        `jr wrong eat: "${jrMsg.shown}" with a ${jrMsg.lock} ms lockout`);
+  check(jrMsg.plain === "12 isn't less than 10 — try again!" && jrMsg.expr === '4+3 = 7, not equal to 10 — try again!' && jrMsg.prime === '9 = 3×3, not prime — try again!',
+        `jr messages for every mode: "${jrMsg.plain}" / "${jrMsg.expr}" / "${jrMsg.prime}"`);
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  check(jrMsg.deathKind === 'dead' && jrMsg.death === 'Oops! A Grumplet bumped you!' && JSON.stringify(jrMsg.px) === JSON.stringify(hex(jrMsg.bg)),
+        `jr caught: "${jrMsg.death}", and no screen flash`);
+  await page.waitForTimeout(60);
+  await shot('21-jr-caught');
+
+  const jrHit = await page.evaluate(() => {
+    const { Engine: E, Loop } = Chompers, s = E.state;
+    E.debug.gotoLevel(1); E.drainEvents();
+    const m = E.mode(), i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params));
+    E.debug.placePlayer(i % 5, Math.floor(i / 5)); E.handle('eat');
+    return [Loop.step(16), Loop.step(16)];
+  });
+  check(JSON.stringify(jrHit) === '[false,true]', 'jr: hit-stop holds a frame after a correct eat');
+
+  // preset names instead of letter entry
+  await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(1); s.spawnT = 1e9;
+    const m = E.mode(), eatWhere = want => {
+      const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
+      E.debug.placePlayer(i % 5, Math.floor(i / 5)); E.handle('eat');
+    };
+    eatWhere(true);
+    for (let k = 0; k < CONFIG.profile.startLives; k++) { eatWhere(false); T.sim(CONFIG.profile.timing.wrongLock + 50); }
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
+  });
+  const e0 = await page.evaluate(() => ({ screen: Chompers.Engine.state.screen, name: Chompers.Engine.state.entry && Chompers.Engine.state.entry.initials.join('') }));
+  await page.keyboard.press('ArrowUp');
+  const e1 = await page.evaluate(() => Chompers.Engine.state.entry.initials.join(''));
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+  const e2 = await page.evaluate(() => Chompers.Engine.state.entry.initials.join(''));
+  await page.waitForTimeout(50);
+  await shot('22-jr-name');
+  await page.keyboard.press('Space'); await page.waitForTimeout(60);
+  const e3 = await page.evaluate(() => ({ screen: Chompers.Engine.state.screen, top: Chompers.Engine.state.hiscores.campaign[0],
+    keys: Object.keys(localStorage).sort(), saved: JSON.parse(localStorage.getItem('chompersjr.v1')) }));
+  check(e0.screen === 'entername' && e0.name === 'YOU' && e1 === 'ACE' && e2 === 'ZIP',
+        `jr name entry: starts on "YOU", arrows step through presets (YOU -> ${e1}, back past YOU to ${e2})`);
+  check(e3.screen === 'gameover' && e3.top && e3.top.name === 'ZIP' && e3.saved.hiscores.campaign[0].name === 'ZIP'
+        && JSON.stringify(e3.keys) === '["chompersjr.v1"]',
+        'jr: chosen preset saved to the top-5 table under chompersjr.v1 only');
+
+  const jrTracks = await page.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, bad = [];
+    for (const id of CONFIG.profile.menu.filter(t => t !== 'campaign')) {
+      const len = E.trackStages(id).length;
+      for (let L = 1; L <= len + 60; L++) if (E.stageFor(id, L).modeId !== id) bad.push(id + L);
+    }
+    return bad;
+  });
+  check(jrTracks.length === 0, 'jr practice tracks never show another mode (to 60 stages past the end)');
+  const jrSound = await page.evaluate(() => ({ ...Chompers.CONFIG.theme.sound }));
+  check(jrSound.pitch > 1 && jrSound.tempo > 1, `jr sounds pitched up (x${jrSound.pitch}) and shorter (x${jrSound.tempo} speed)`);
+  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => { const E = Chompers.Engine; E.debug.gotoLevel(5); E.state.spawnT = 0; T.sim(200); });
+  await page.waitForTimeout(80);
+  await shot('23-jr-board');
+
   // ===================== screenshot of a busy level =====================
   await fresh();
   await page.evaluate(() => {
@@ -1254,6 +1422,27 @@ function pageHelpers() {
   const jOffline = await jp.evaluate(() => typeof Chompers === 'object' && Chompers.CONFIG.game + '/' + document.title);
   await J.setOffline(false);
   check(jOffline === 'jr/Chompers Jr', 'jr: offline reload still starts Chompers Jr');
+  await jp.addInitScript(pageHelpers); await jp.reload(); await jp.waitForTimeout(250);
+  await jp.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(1); s.spawnT = 1e9;
+    const m = E.mode(), eatWhere = want => {
+      const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
+      E.debug.placePlayer(i % 5, Math.floor(i / 5)); E.handle('eat');
+    };
+    eatWhere(true);
+    for (let k = 0; k < CONFIG.profile.startLives; k++) { eatWhere(false); T.sim(CONFIG.profile.timing.wrongLock + 50); }
+    T.sim(CONFIG.profile.timing.gameOverGuard + 50);
+  });
+  const jtap = async (x, y) => {
+    const r = await jp.evaluate(() => { const b = Chompers.Render.canvas.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+    await jp.touchscreen.tap(r.x + x * r.w / 320, r.y + y * r.h / 200);
+  };
+  await jtap(160, 68);                         // up arrow over the name
+  const jName = await jp.evaluate(() => Chompers.Engine.state.entry.initials.join(''));
+  await jtap(160, 167);                        // SAVE
+  const jSaved = await jp.evaluate(() => ({ screen: Chompers.Engine.state.screen, top: Chompers.Engine.state.hiscores.campaign[0] }));
+  check(jName === 'ACE' && jSaved.screen === 'gameover' && jSaved.top.name === 'ACE', 'jr touch: tap the arrow to pick a preset name, tap SAVE');
   await J.close();
 
   // ---- portrait phone ----

@@ -135,7 +135,8 @@ const MathUtil = {
 // displayed text, and every value must fit in board.maxChars characters.
 // rnd(lo, hi) returns an integer in [lo, hi].
 const pickN = (p, rnd) => ({ ...p, n: Array.isArray(p.ns) ? MathUtil.pick(p.ns, rnd) : p.n });
-const widenMax = (p, f) => ({ ...p, max: Math.min(CONFIG.profile.escalation.maxNumber, Math.round(p.max * f)) });
+// widen `max`, capped at escalation.maxNumber but never below the stage's own max
+const widenMax = (p, f) => ({ ...p, max: Math.max(p.max, Math.min(CONFIG.profile.escalation.maxNumber, Math.round(p.max * f))) });
 
 const MODES = {
   multiples: {
@@ -217,34 +218,41 @@ const MODES = {
   },
 
   // Stage params: variant ('eq' | 'lt' | 'gt'), ns (targets to pick from, or n),
-  //   ops (any of '+', '−', '×', '÷'), operand [lo, hi].
+  //   ops (any of '+', '−', '×', '÷'), operand [lo, hi], optional plain: true.
   // Cells are expressions "a op b". Both operands come from the operand range,
   // except ÷, where the divisor and the RESULT do (so the dividend can be larger).
   // Subtraction never goes negative; division is always exact.
+  // plain: true -> cells are plain numbers from the operand range instead (no ops).
   equals: {
     name: 'Equals/Inequality',
     variants: { eq: 'Equal to', lt: 'Less than', gt: 'Greater than' },
     nearMissChance: 0.5, // chance a WRONG cell's value lands within nearMissSpread of N
     nearMissSpread: 3,
     setup: pickN,
-    // larger operands; for less/greater-than the target N scales too (equal-to keeps N)
+    // larger operands; for less/greater-than the target N scales too (equal-to keeps N).
+    // The cap (escalation.maxOperand) never shrinks a range, and when it bites, N scales
+    // with the range that is really there, so every board can still be filled.
     widen(p, f) {
-      const scaleN = n => (p.variant === 'eq' ? n : Math.round(n * f));
-      const hi = Math.min(CONFIG.profile.escalation.maxOperand, Math.max(p.operand[1], Math.round(p.operand[1] * f)));
+      const hi0 = p.operand[1], want = Math.round(hi0 * f);
+      const hi = Math.max(hi0, Math.min(CONFIG.profile.escalation.maxOperand, want));
+      const g = hi < want ? hi / hi0 : f;
+      const scaleN = n => (p.variant === 'eq' ? n : Math.round(n * g));
       const out = { ...p, operand: [p.operand[0], hi] };
       if (Array.isArray(p.ns)) out.ns = p.ns.map(scaleN);
       if (p.n !== undefined) out.n = scaleN(p.n);
       return out;
     },
     title(p) { return `${this.variants[p.variant]} ${p.n}`; },
+    valueOf: v => (typeof v === 'number' ? v : MathUtil.evalExpr(v)),
     isCorrect(v, p) {
-      const x = MathUtil.evalExpr(v);
+      const x = this.valueOf(v);
       if (p.variant === 'lt') return x < p.n;
       if (p.variant === 'gt') return x > p.n;
       return x === p.n;
     },
     randomExpr(p, rnd) {
       const [lo, hi] = p.operand;
+      if (p.plain) return rnd(lo, hi);
       const op = MathUtil.pick(p.ops, rnd);
       let a = rnd(lo, hi), b = rnd(lo, hi);
       if (op === '−' && a < b) [a, b] = [b, a];
@@ -257,13 +265,14 @@ const MODES = {
       for (let i = 0; i < 400; i++) {
         const s = this.randomExpr(p, rnd);
         if (s === null || this.isCorrect(s, p) !== want) continue;
-        if (near && i < 200 && Math.abs(MathUtil.evalExpr(s) - p.n) > this.nearMissSpread) continue;
+        if (near && i < 200 && Math.abs(this.valueOf(s) - p.n) > this.nearMissSpread) continue;
         return s;
       }
       return null;
     },
     explain(v, p) {
-      return `${v} = ${MathUtil.evalExpr(v)}, not ${this.variants[p.variant].toLowerCase()} ${p.n}`;
+      const rel = `${this.variants[p.variant].toLowerCase()} ${p.n}`;
+      return typeof v === 'number' ? `${v} is not ${rel}` : `${v} = ${MathUtil.evalExpr(v)}, not ${rel}`;
     },
   },
 };
@@ -336,6 +345,24 @@ const REGULAR_CAMPAIGN = [
   /* 22 */ { mode: 'equals',    params: { variant: 'gt', ns: [50], ops: ['+', '−', '×', '÷'], operand: [2, 12] }, safeCell: true, enemies: { count: 4, ...WSS, spawnDelay: 2000, tickMult: 0.75 } },
 ];
 
+// Chompers Jr: gentle stages for younger kids on a 5x4 board (20 cells, so every
+// range below holds at least 20 unique values). No factors. At most one slow
+// Wanderer per stage; Stalkers only show up in escalation.
+const JR1 = { count: 1, types: ['wanderer'], spawnDelay: 6000, tickMult: 1.0 };
+const JR_CAMPAIGN = [
+  /*  1 */ { mode: 'multiples', params: { n: 2, max: 20 },                                                   safeCell: true },
+  /*  2 */ { mode: 'multiples', params: { n: 10, max: 100 },                                                 safeCell: true },
+  /*  3 */ { mode: 'multiples', params: { n: 5, max: 50 },                                                   safeCell: true, enemies: JR1 },
+  /*  4 */ { mode: 'equals',    params: { variant: 'eq', ns: [8, 10], ops: ['+'], operand: [1, 10] },        safeCell: true, enemies: JR1 },
+  /*  5 */ { mode: 'multiples', params: { n: 2, max: 40 },                                                   safeCell: true, enemies: JR1 },
+  /*  6 */ { mode: 'equals',    params: { variant: 'lt', ns: [10], plain: true, operand: [1, 25] },          safeCell: true, enemies: JR1 },
+  /*  7 */ { mode: 'equals',    params: { variant: 'eq', ns: [10, 12], ops: ['+', '−'], operand: [1, 12] },  safeCell: true, enemies: JR1 },
+  /*  8 */ { mode: 'equals',    params: { variant: 'gt', ns: [10, 15], plain: true, operand: [1, 30] },      safeCell: true, enemies: JR1 },
+  /*  9 */ { mode: 'multiples', params: { n: 3, max: 30 },                                                   safeCell: true, enemies: JR1 },
+  /* 10 */ { mode: 'equals',    params: { variant: 'eq', ns: [12, 15], ops: ['+', '−'], operand: [1, 15] },  safeCell: true, enemies: JR1 },
+  /* 11 */ { mode: 'primes',    params: { max: 20 },                                                         safeCell: true, enemies: JR1 },
+];
+
 // A profile = the RULES of one game. Everything the engine reads comes from here.
 //   storageKey   localStorage key for this game's scores and settings
 //   grid, startLives, scoring, board, timing, enemies, safeCell, feel, escalation
@@ -343,8 +370,8 @@ const REGULAR_CAMPAIGN = [
 //   menu         title-menu tracks, top to bottom: 'campaign' plays the whole campaign;
 //                a mode id is practice (only that mode's stages, then escalation)
 //   trackNames   label of each track (menu, high-score tables, game over)
-//   hiscores     table size, initials alphabet; optional presets: [...] replaces
-//                letter-by-letter entry with picking one of these names
+//   hiscores     table size, initials alphabet, default initials; optional presets: [...]
+//                replaces letter-by-letter entry with picking one of these names
 //   enemyTypes   the Grump kit: { id: { name, tickMs, altersNumbers, move, ...tunables } }
 //                name: shown when it catches you; tickMs: ms between steps (times the
 //                stage's tickMult); altersNumbers: rewrites every cell it steps on
@@ -437,8 +464,59 @@ const PROFILES = {
     campaign: REGULAR_CAMPAIGN,
   },
 };
-// placeholder until the Jr rules land: regular rules, separate saves
-PROFILES.jr = { ...PROFILES.regular, storageKey: 'chompersjr.v1' };
+// Chompers Jr: bigger cells, more lives, shorter lockouts, one slow Grump at a time,
+// a long-lasting safe cell, no death flash, and a gentler escalation.
+PROFILES.jr = {
+  storageKey: 'chompersjr.v1',
+  grid: { cols: 5, rows: 4 },
+  startLives: 5,
+  menu: ['campaign', 'multiples', 'equals', 'primes'],
+  trackNames: {
+    campaign: 'Adventure', multiples: 'Practice: Multiples',
+    equals: 'Practice: Equal/Less/More', primes: 'Practice: Primes',
+  },
+  scoring: { correct: 5, levelBonus: 10 },
+  board: { correctRatio: 0.45, minCorrect: 5, maxChars: 6 },
+  timing: {
+    wrongLock: 900,       // shorter than regular: back to playing quickly
+    goodFlash: 450,
+    chomp: 180,
+    levelClear: 2000,
+    gameOverGuard: 700,
+    deathLock: 1100,
+    rewriteFlash: 450,
+  },
+  enemies: { maxOnScreen: 3, spawnMinDistance: 3, freezeDuringWrongEat: true, rewriteEaten: false },
+  safeCell: { firstDelay: 2000, duration: 12000, cooldown: 4000, blinkBefore: 2500 },
+  feel: {
+    deathFlash: false,    // no white flash for little ones
+    deathFlashMs: 140, deathFlashColor: '#ffffff', deathFlashAlpha: 0.55,
+    hitStop: true, hitStopFrames: 1,
+  },
+  hiscores: {
+    perTrack: 5,
+    alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    defaultInitials: 'YOU',
+    presets: ['YOU', 'ACE', 'BOO', 'FOX', 'JOY', 'MAX', 'OWL', 'POP', 'SUN', 'ZIP'], // no typing: pick one
+  },
+  // same formula as regular, slower and shallower: smaller range steps, a Grump
+  // added only every 6 stages (cap 3), speed and safe time drop slowly to high floors
+  escalation: {
+    rangeStep: 0.05, rangeMax: 2,
+    extraEnemyEvery: 6,
+    tickDecay: 0.985, tickFloor: 0.7,
+    safeDecay: 0.97, safeFloor: 6000,
+    types: ['wanderer', 'wanderer', 'stalker'],
+    spawnDelay: 6000,
+    maxNumber: 120,
+    maxOperand: 40,  // expressions stay small; plain-number ranges can still grow
+  },
+  enemyTypes: {
+    wanderer: { name: 'Wanderer', tickMs: 1600, altersNumbers: true,  straightBias: 0.7,     move: MOVES.wander },
+    stalker:  { name: 'Stalker',  tickMs: 1800, altersNumbers: false, randomStepChance: 0.6, move: MOVES.stalk },
+  },
+  campaign: JR_CAMPAIGN,
+};
 
 // A theme = the LOOK of one game. Only RENDER, SOUND and the boot code read it.
 //   title, characterName, grumpName   names shown in the game
@@ -550,14 +628,105 @@ const THEMES = {
     deathText: null,
   },
 };
-// placeholder until the Jr look lands: regular look, its own name, icons and cache
+// Chompers Jr: warm, bright colours, a rounder big-eyed Chompy with rosy cheeks,
+// friendlier Grumplets, higher and snappier sounds, kinder messages.
 THEMES.jr = {
-  ...THEMES.regular,
   title: 'Chompers Jr',
+  characterName: 'Chompy',
+  grumpName: 'Grumplet',
+  footer: 'not affiliated with Number Munchers™ / MECC · for personal play.',
   manifest: 'manifest-jr.json',
   cacheName: 'chompersjr',
   icons: { 192: 'icons/chompersjr-192.png', 512: 'icons/chompersjr-512.png' },
-  favicon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAe0lEQVR42mNgGAWjgEjAxyPznxQ89B2AbqDTsRUkYYodNGAOQLcQHRCyGJd6oh0yYA7AFdQwQGxUEFKP0yGDzgGkZjtCeOg6AD1IyeUPXQeMpoGR6wBcBQupfKqXhDRzACGHkBvkFNeGdHfAaIuI2MYoueqGngNGwbAHAPpgQuExoryYAAAAAElFTkSuQmCC', // generated by tests/make-icons.js (jr)
+  sound: { pitch: 1.12, tempo: 1.25 }, // a little higher, a little shorter
+  titleLayout: { titleScale: 4, titleY: 8, tagline: 'Help Chompy eat the right numbers!', taglineY: 40,
+                 ground: 79, menuY: 92, menuStep: 14 },
+  palette: {
+    pageBg:     '#1d1022',
+    bg:         '#2b1b33',
+    panel:      '#45284f',
+    cell:       '#5e3466',
+    cellEdge:   '#b0679e',
+    cellEaten:  '#341d3a',
+    number:     '#fff3df',
+    dim:        '#e2bfd6',
+    accent:     '#ffd166',
+    good:       '#8be28b',
+    bad:        '#ff9f80',   // a soft coral, not alarm red
+    safeFill:   '#2a6170',
+    safeEdge:   '#8ff0f0',
+    rewrite:    '#ffd166',
+    outline:    '#24132f',
+    body:       '#5fe0b0',
+    bodyHurt:   '#ffb39a',
+    eye:        '#ffffff',
+    mouth:      '#24132f',
+    tooth:      '#ffffff',
+    cheek:      '#ff9ec4',
+  },
+  grumpColors: { wanderer: '#ffb15e', stalker: '#c49bff' },
+  sprites: {
+    idle: [ // round, big eyes, rosy cheeks
+      '....oooooo....',
+      '..oobbbbbboo..',
+      '.obbbbbbbbbbo.',
+      '.obwwwbbwwwbo.',
+      'obbwwkbbwwkbbo',
+      'obbwkkbbwkkbbo',
+      'obpbbbbbbbbpbo',
+      'obbbkbbbbkbbbo',
+      '.obbbkkkkbbbo.',
+      '..obbbbbbbbo..',
+      '...oooooooo...',
+      '...oo....oo...',
+    ],
+    chomp: [
+      '....oooooo....',
+      '..oobbbbbboo..',
+      '.obbbbbbbbbbo.',
+      '.obwwwbbwwwbo.',
+      'obbwwkbbwwkbbo',
+      'obbwkkbbwkkbbo',
+      'obkkkkkkkkkkbo',
+      'obkttkkkkttkbo',
+      'obkkkkkkkkkkbo',
+      '.obkkkkkkkkbo.',
+      '..oobbbbbboo..',
+      '...oo....oo...',
+    ],
+    dead: [ // dizzy, not scary
+      '....oooooo....',
+      '..oobbbbbboo..',
+      '.obbbbbbbbbbo.',
+      '.obkbkbbkbkbo.',
+      'obbbkbbbbkbbbo',
+      'obbkbkbbkbkbbo',
+      'obpbbbbbbbbpbo',
+      'obbbbbkkbbbbbo',
+      '.obbbkbbkbbbo.',
+      '..obbbkkbbbo..',
+      '...oooooooo...',
+      '...oo....oo...',
+    ],
+    grumpHalf: [ // round, wide-eyed, a small pout instead of fangs
+      '...oooo',
+      '..occcc',
+      '.occccc',
+      '.occckc',
+      'occwwcc',
+      'occwkcc',
+      'occcccc',
+      'occcckk',
+      'occcccc',
+      '.occccc',
+      '..ooooo',
+    ],
+    grumpFeet: ['.oo........oo.', '...oo....oo...'],
+    safeIcon: ['.ooo.', 'ooooo', 'ooooo', '.ooo.', '..o..'],
+  },
+  wrongText: msg => msg.replace(' is not ', " isn't ") + ' — try again!',
+  deathText: () => 'Oops! A Grumplet bumped you!',
+  favicon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAd0lEQVR42mNgGAWjgEigIqz/nxQ89B2AbmD8gw0kYYodNGAOINdCYh009ByAC6BbQEjd4HcArqBHB5Sqw+mQQe8AQtmSWHVDxwGkFr2E8NB1AK7EhQsTSoxDzwEjJw3QyiEU1wV0d8Boi4iQQ6itfvA7YBQMewAAOKq3FT+rGAYAAAAASUVORK5CYII=', // generated by tests/make-icons.js (jr)
 };
 
 // Which game: ?game=<id> (if that profile and theme exist), else the first matching
@@ -910,7 +1079,13 @@ const Engine = (() => {
     const list = state.hiscores[state.track] || [];
     state.newEntry = null;
     if (Hiscores.qualifies(list, state.score, PR.hiscores.perTrack)) {
-      state.entry = { initials: [...state.initials], pos: 0 };
+      const presets = PR.hiscores.presets;
+      if (presets && presets.length) {     // pick a ready-made name instead of typing letters
+        const i = Math.max(0, presets.indexOf(state.initials));
+        state.entry = { initials: [...presets[i]], pos: 0, preset: i };
+      } else {
+        state.entry = { initials: [...state.initials], pos: 0 };
+      }
       state.screen = 'entername';
     } else {
       state.screen = 'gameover';
@@ -919,9 +1094,15 @@ const Engine = (() => {
   }
 
   // Up/Down change the letter under the cursor, Left/Right move it, Space/Enter saves.
+  // With hiscores.presets, every arrow steps through the preset names instead.
   function nameEntry(action, go) {
-    const e = state.entry, A = PR.hiscores.alphabet;
-    if (action === 'up' || action === 'down') {
+    const e = state.entry, A = PR.hiscores.alphabet, presets = PR.hiscores.presets;
+    if (e.preset !== undefined && ['up', 'down', 'left', 'right'].includes(action)) {
+      const step = action === 'up' || action === 'right' ? 1 : presets.length - 1;
+      e.preset = (e.preset + step) % presets.length;
+      e.initials = [...presets[e.preset]];
+      emit('menu');
+    } else if (action === 'up' || action === 'down') {
       const i = Math.max(0, A.indexOf(e.initials[e.pos]));
       e.initials[e.pos] = A[(i + (action === 'up' ? 1 : A.length - 1)) % A.length];
       emit('menu');
@@ -1214,6 +1395,7 @@ const Render = (() => {
     ')':[8,4,2,2,2,4,8], '·':[0,0,0,12,12,0,0], '×':[0,17,10,4,10,17,0],
     '−':[0,0,0,31,0,0,0], '÷':[0,4,0,31,0,4,0], '<':[2,4,8,16,8,4,2], '>':[8,4,2,1,2,4,8],
     '↑':[4,14,21,4,4,4,4], '↓':[4,4,4,4,21,14,4], '←':[0,4,8,31,8,4,0], '→':[0,4,2,31,2,4,0],
+    '—':[0,0,0,31,0,0,0], '&':[12,18,20,8,21,18,13],
   };
   // Condensed 3x7 digits/operators (3-bit rows) for long cell text, e.g. "100÷10".
   // Same height as FONT, so a condensed cell lines up with its neighbours.
@@ -1493,6 +1675,24 @@ const Render = (() => {
     text('Score ' + s.score, W / 2, 42, P.number, 1, 'center');
     text(`${Engine.trackLabel(s.track)}  ·  Stage ${s.level}`, W / 2, 54, P.dim, 1, 'center');
     const e = s.entry, pitch = 30, x0 = W / 2 - pitch;
+    if (e.preset !== undefined) {               // profile.hiscores.presets: pick a name, no typing
+      frame(W / 2 - 40, 82, 80, 36, P.accent);
+      text(e.initials.join(''), W / 2, 86, P.accent, 4, 'center');
+      for (let k = 0; k < 6; k++) {
+        rect(W / 2 - k, 66 + k, 2 * k + 1, 1, P.accent);
+        rect(W / 2 - k, 133 - k, 2 * k + 1, 1, P.accent);
+      }
+      if (hints.touch) {
+        text('Tap the arrows to pick a name', W / 2, 146, P.dim, 1, 'center');
+        rect(W / 2 - 36, 158, 72, 20, P.panel);
+        frame(W / 2 - 36, 158, 72, 20, P.accent);
+        text('Save', W / 2, 165, P.accent, 1, 'center');
+      } else {
+        text('Up/Down pick a name', W / 2, 152, P.dim, 1, 'center');
+        text('Space save', W / 2, 166, P.number, 1, 'center');
+      }
+      return;
+    }
     e.initials.forEach((ch, i) => {
       const cx = x0 + i * pitch, sel = i === e.pos;
       frame(cx - 13, 82, 26, 36, sel ? P.accent : P.cellEdge);
@@ -1592,6 +1792,15 @@ const Render = (() => {
       }
       case 'entername': {
         const pitch = 30, x0 = W / 2 - pitch;
+        if (s.entry.preset !== undefined) {     // one name box with an arrow above and below
+          if (Math.abs(x - W / 2) <= 44) {
+            if (y >= 56 && y < 82) return { kind: 'letter', index: 0, dir: 'up' };
+            if (y >= 82 && y < 118) return { kind: 'letter', index: 0, dir: null };
+            if (y >= 118 && y < 144) return { kind: 'letter', index: 0, dir: 'down' };
+          }
+          if (y >= 154 && y < 182 && Math.abs(x - W / 2) <= 44) return { kind: 'save' };
+          return null;
+        }
         for (let i = 0; i < s.entry.initials.length; i++) {
           if (Math.abs(x - (x0 + i * pitch)) > pitch / 2) continue;
           if (y >= 56 && y < 82) return { kind: 'letter', index: i, dir: 'up' };
