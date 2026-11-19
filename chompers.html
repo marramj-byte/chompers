@@ -2,14 +2,31 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Chompers</title>
+<meta name="theme-color" content="#1f1b3a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Chompers">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAe0lEQVR42mNgGAWjgEjAxyPznxQ89B2AbqDTsRUkYYodNGAOQLcQHRCyGJd6oh0yYA7AFdQwQGxUEFKP0yGDzgGkZjtCeOg6AD1IyeUPXQeMpoGR6wBcBQupfKqXhDRzACGHkBvkFNeGdHfAaIuI2MYoueqGngNGwbAHAPpgQuExoryYAAAAAElFTkSuQmCC">
+<link rel="apple-touch-icon" href="icons/chompers-192.png">
 <style>
+  :root { --sat: env(safe-area-inset-top, 0px); --sar: env(safe-area-inset-right, 0px);
+          --sab: env(safe-area-inset-bottom, 0px); --sal: env(safe-area-inset-left, 0px); }
   html, body { margin: 0; height: 100%; background: #0b0a16; color: #8a86a8; }
-  body { display: flex; flex-direction: column; align-items: center; justify-content: center;
-         font: 11px/1.4 system-ui, sans-serif; overflow: hidden; }
-  canvas { display: block; outline: none; image-rendering: pixelated; image-rendering: crisp-edges; }
-  footer { padding: 6px 16px; opacity: .65; text-align: center; }
+  /* the page never scrolls or zooms: everything is positioned by layout() in INPUT */
+  body { position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; touch-action: none;
+         -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+         -webkit-tap-highlight-color: transparent; font: 11px/1.4 system-ui, sans-serif; }
+  canvas#screen { position: absolute; display: block; outline: none; touch-action: none;
+                  image-rendering: pixelated; image-rendering: crisp-edges; }
+  footer { position: absolute; left: 0; right: 0; padding: 6px 16px; opacity: .65; text-align: center; pointer-events: none; }
+  .tbtn { position: absolute; display: none; align-items: center; justify-content: center; box-sizing: border-box;
+          margin: 0; padding: 0; border: 2px solid; touch-action: none; cursor: pointer; }
+  .tbtn.show { display: flex; }
+  .tbtn canvas, #rotate canvas { image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; }
+  #rotate { position: absolute; display: none; padding: 8px 12px; border: 2px solid; touch-action: none; }
 </style>
 </head>
 <body>
@@ -24,7 +41,8 @@
  * ===================================================================== */
 
 const CONFIG = {
-  title: 'Chompers',                 // rename the game here (+ <title> tag)
+  title: 'Chompers',                 // rename the game here (+ <title> tag and manifest.json)
+  version: '0.5.0',                  // bump on every release: names the offline cache (sw.js)
   view: { width: 320, height: 200 }, // logical canvas resolution
   grid: { cols: 6, rows: 5 },
   startLives: 3,
@@ -97,7 +115,20 @@ const CONFIG = {
     defaultInitials: 'AAA',
   },
 
-  storage: {               // one localStorage entry holds high scores, mute and last initials
+  touch: {                 // touch layer (INPUT); sizes are CSS px
+    eatSide: 'right',      // 'right' or 'left': bottom corner for the EAT button (pause goes opposite)
+    eatSize: 72,           // EAT button (never below 56)
+    padSize: 56,           // each D-pad button (never below 56)
+    smallSize: 44,         // pause button
+    toggleW: 132, toggleH: 44, // title-screen TOUCH / SOUND toggles
+    gap: 8,                // between buttons, and from the screen edges
+    stepMs: 150,           // tap-to-move: one cell per this many ms (also D-pad hold repeat)
+    padRepeatDelay: 280,   // hold a D-pad button: first repeat after this
+    defaultMode: 'tap',    // 'tap' or 'pad' until the player picks one on the title screen
+    rotateHintMs: 5000,    // portrait "rotate for best play" hint
+  },
+
+  storage: {               // one localStorage entry holds high scores, mute, last initials, touch mode
     key: 'chompers.v1',    // bump the version (key and number) if the saved shape ever changes
     version: 1,
   },
@@ -1016,7 +1047,6 @@ const Engine = (() => {
 const Render = (() => {
   const W = CONFIG.view.width, H = CONFIG.view.height, P = CONFIG.palette;
   const canvas = document.getElementById('screen');
-  const footer = document.getElementById('footer');
   const ctx = canvas.getContext('2d');
   canvas.width = W; canvas.height = H;
 
@@ -1044,6 +1074,7 @@ const Render = (() => {
     '?':[14,17,1,2,4,0,4], '/':[0,1,2,4,8,16,0], "'":[4,4,8,0,0,0,0], '(':[2,4,8,8,8,4,2],
     ')':[8,4,2,2,2,4,8], '·':[0,0,0,12,12,0,0], '×':[0,17,10,4,10,17,0],
     '−':[0,0,0,31,0,0,0], '÷':[0,4,0,31,0,4,0], '<':[2,4,8,16,8,4,2], '>':[8,4,2,1,2,4,8],
+    '↑':[4,14,21,4,4,4,4], '↓':[4,4,4,4,21,14,4], '←':[0,4,8,31,8,4,0], '→':[0,4,2,31,2,4,0],
   };
   // Condensed 3x7 digits/operators (3-bit rows) for long cell text, e.g. "100÷10".
   // Same height as FONT, so a condensed cell lines up with its neighbours.
@@ -1061,21 +1092,36 @@ const Render = (() => {
     return w ? (w - 1) * scale : 0;
   }
 
-  function text(str, x, y, color, scale = 1, align = 'left', condensed = false) {
+  // target: the 2D context to draw on (the game canvas unless given)
+  function text(str, x, y, color, scale = 1, align = 'left', condensed = false, target = ctx) {
     str = String(str).toUpperCase();
     if (align === 'center') x -= Math.floor(textWidth(str, scale, condensed) / 2);
     else if (align === 'right') x -= textWidth(str, scale, condensed);
-    ctx.fillStyle = color;
+    target.fillStyle = color;
     for (const ch of str) {
       const { g, w } = glyph(ch, condensed);
       for (let r = 0; r < 7; r++) {
         const bits = g[r];
         if (!bits) continue;
-        for (let c = 0; c < w; c++) if (bits & (1 << (w - 1 - c))) ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+        for (let c = 0; c < w; c++) if (bits & (1 << (w - 1 - c))) target.fillRect(x + c * scale, y + r * scale, scale, scale);
       }
       x += (w + 1) * scale;
     }
   }
+
+  // Pixel-font text on its own small canvas (touch button labels), `scale` CSS px per font pixel.
+  function label(str, color, scale = 2) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, textWidth(str, 1));
+    c.height = 7;
+    c.style.width = c.width * scale + 'px';
+    c.style.height = c.height * scale + 'px';
+    text(str, 0, 0, color, 1, 'left', false, c.getContext('2d'));
+    return c;
+  }
+
+  // Set by the touch layer: swaps keyboard instructions for tap ones, shows tap targets.
+  const hints = { touch: false };
 
   // Cell text rule (both sizes): up to 3 characters use the normal font; longer
   // strings (expressions, up to board.maxChars = 6) use the condensed font.
@@ -1227,9 +1273,15 @@ const Render = (() => {
     text('High scores', 254, 90, P.dim, 1, 'center');
     drawTable(s.hiscores[CONFIG.menu[s.menuIndex]] || [], 254, 102, 10, -1, t);
 
-    if (Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 158, P.accent, 1, 'center');
-    text('Arrows/WASD move  Space eat  Esc pause', W / 2, 172, P.dim, 1, 'center');
-    text(`Up/Down choose   M sound ${s.muted ? 'off' : 'on'}`, W / 2, 184, P.dim, 1, 'center');
+    if (hints.touch) {
+      if (Math.floor(t / 500) % 2 === 0) text('Tap a mode, then tap it again', W / 2, 158, P.accent, 1, 'center');
+      text('Tap a cell to walk there', W / 2, 172, P.dim, 1, 'center');
+      text('Tap yourself or EAT to eat', W / 2, 184, P.dim, 1, 'center');
+    } else {
+      if (Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 158, P.accent, 1, 'center');
+      text('Arrows/WASD move  Space eat  Esc pause', W / 2, 172, P.dim, 1, 'center');
+      text(`Up/Down choose   M sound ${s.muted ? 'off' : 'on'}`, W / 2, 184, P.dim, 1, 'center');
+    }
   }
 
   // v: the game state, or the attract demo's view of a board (demo: true, no player)
@@ -1317,7 +1369,7 @@ const Render = (() => {
     const hudY = H - HUD_H;
     rect(0, hudY, W, HUD_H, P.panel);
     if (v.demo) {
-      if (Math.floor(t / 500) % 2 === 0) text('Press any key', W / 2, hudY + 8, P.accent, 1, 'center');
+      if (Math.floor(t / 500) % 2 === 0) text(hints.touch ? 'Tap to return' : 'Press any key', W / 2, hudY + 8, P.accent, 1, 'center');
     } else {
       text('Score ' + String(v.score).padStart(5, '0'), MARGIN, hudY + 8, P.number);
       if (v.muted) text('Muted', W / 2, hudY + 8, P.dim, 1, 'center');
@@ -1357,15 +1409,27 @@ const Render = (() => {
       const cx = x0 + i * pitch, sel = i === e.pos;
       frame(cx - 13, 82, 26, 36, sel ? P.accent : P.cellEdge);
       text(ch, cx, 86, sel ? P.accent : P.number, 4, 'center');
-      if (sel && Math.floor(t / 300) % 2 === 0) {
+      if (hints.touch) {                        // tap targets: an arrow above and below every letter
+        for (let k = 0; k < 6; k++) {
+          rect(cx - k, 66 + k, 2 * k + 1, 1, sel ? P.accent : P.dim);
+          rect(cx - k, 133 - k, 2 * k + 1, 1, sel ? P.accent : P.dim);
+        }
+      } else if (sel && Math.floor(t / 300) % 2 === 0) {
         for (let k = 0; k < 4; k++) {           // little arrows above and below
           rect(cx - k, 76 - 3 + k, 2 * k + 1, 1, P.accent);
           rect(cx - k, 124 + 3 - k, 2 * k + 1, 1, P.accent);
         }
       }
     });
-    text('Up/Down letter   Left/Right move', W / 2, 152, P.dim, 1, 'center');
-    text('Space save', W / 2, 166, P.number, 1, 'center');
+    if (hints.touch) {
+      text('Tap the arrows to change letters', W / 2, 146, P.dim, 1, 'center');
+      rect(W / 2 - 36, 158, 72, 20, P.panel);
+      frame(W / 2 - 36, 158, 72, 20, P.accent);
+      text('Save', W / 2, 165, P.accent, 1, 'center');
+    } else {
+      text('Up/Down letter   Left/Right move', W / 2, 152, P.dim, 1, 'center');
+      text('Space save', W / 2, 166, P.number, 1, 'center');
+    }
   }
 
   function drawGameOver(s, t) {
@@ -1377,7 +1441,7 @@ const Render = (() => {
     text('High scores', W / 2, 84, P.dim, 1, 'center');
     const hl = s.newEntry && s.newEntry.track === s.track ? s.newEntry.rank : -1;
     drawTable(s.hiscores[s.track] || [], W / 2, 96, 11, hl, t);
-    if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text('Press Space', W / 2, 172, P.accent, 1, 'center');
+    if (s.screenT <= 0 && Math.floor(t / 500) % 2 === 0) text(hints.touch ? 'Tap to continue' : 'Press Space', W / 2, 172, P.accent, 1, 'center');
   }
 
   function draw(s, t) {
@@ -1393,7 +1457,7 @@ const Render = (() => {
       case 'paused':
         drawBoard(s, t); dim();
         text('Paused', W / 2, 74, P.accent, 3, 'center');
-        text('Esc or Space to resume', W / 2, 108, P.number, 1, 'center');
+        text(hints.touch ? 'Tap to resume' : 'Esc or Space to resume', W / 2, 108, P.number, 1, 'center');
         break;
       case 'levelclear': {
         const st = s.levelStats;
@@ -1407,17 +1471,53 @@ const Render = (() => {
     }
   }
 
-  // Integer scaling for crisp pixels; fractional only if the window is tiny.
-  function fit() {
-    const availW = window.innerWidth - 8;
-    const availH = window.innerHeight - footer.offsetHeight - 8;
-    let s = Math.min(availW / W, availH / H);
-    s = s >= 1 ? Math.floor(s) : s;
-    canvas.style.width = Math.floor(W * s) + 'px';
-    canvas.style.height = Math.floor(H * s) + 'px';
+  // CSS position and size of the canvas, chosen by layout() in INPUT.
+  function place(left, top, w, h) {
+    Object.assign(canvas.style, { left: left + 'px', top: top + 'px', width: w + 'px', height: h + 'px' });
   }
 
-  return { draw, fit, canvas };
+  // Touch hit-testing: a point in canvas pixels (0..320, 0..200) -> what is
+  // there on the current screen. Uses the same geometry the screens are drawn with.
+  //   playing   { kind: 'cell', col, row }: nearest cell, also for taps up to half a
+  //             cell outside the grid (its frame, the header, the HUD, or just beside
+  //             the canvas: x and y may be outside 0..320 / 0..200)
+  //   title     { kind: 'menu', index }
+  //   entername { kind: 'letter', index, dir: 'up' | 'down' | null } or { kind: 'save' }
+  //   other screens: { kind: 'screen' } (a tap anywhere)
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function hitTest(s, x, y) {
+    const { cols, rows } = CONFIG.grid;
+    switch (s.screen) {
+      case 'playing': {
+        const gw = cellW * cols, gh = cellH * rows;
+        if (x < gridX - cellW / 2 || x > gridX + gw + cellW / 2 || y < gridY - cellH / 2 || y > gridY + gh + cellH / 2) return null;
+        return { kind: 'cell', col: clamp(Math.floor((x - gridX) / cellW), 0, cols - 1),
+                 row: clamp(Math.floor((y - gridY) / cellH), 0, rows - 1) };
+      }
+      case 'title':
+        for (let i = 0; i < CONFIG.menu.length; i++) {
+          const y0 = 90 + i * 12 - 3;
+          if (x < 190 && y >= y0 && y < y0 + 12) return { kind: 'menu', index: i };
+        }
+        return null;
+      case 'entername': {
+        const pitch = 30, x0 = W / 2 - pitch;
+        for (let i = 0; i < s.entry.initials.length; i++) {
+          if (Math.abs(x - (x0 + i * pitch)) > pitch / 2) continue;
+          if (y >= 56 && y < 82) return { kind: 'letter', index: i, dir: 'up' };
+          if (y >= 82 && y < 118) return { kind: 'letter', index: i, dir: null };
+          if (y >= 118 && y < 144) return { kind: 'letter', index: i, dir: 'down' };
+        }
+        if (y >= 154 && y < 182 && Math.abs(x - W / 2) <= 44) return { kind: 'save' };
+        return null;
+      }
+      default:
+        return { kind: 'screen' };
+    }
+  }
+
+  return { draw, place, canvas, label, hitTest, hints,
+           geom: { W, H, gridX, gridY, cellW, cellH } };
 })();
 
 
@@ -1531,9 +1631,11 @@ const Storage = (() => {
 /* =====================================================================
  * 6. INPUT
  *    Physical input -> abstract actions -> Engine.handle(action).
- *    A touch layer can be added later by calling emit('up'), emit('eat'), ...
- *    Unmapped keys send 'any' (wakes the title / ends the attract demo).
- *    Key and pointer handlers also unlock audio (browsers require a gesture).
+ *    Keyboard: KEYMAP. Unmapped keys send 'any' (wakes the title / ends the demo).
+ *    Touch: taps on the canvas, on-screen buttons and the layout that places them.
+ *      Everything still goes through emit(action); the touch layer only *reads*
+ *      Engine.state (screen, player, lockT, menu/entry cursor) to decide what to send.
+ *    Key, pointer and touch handlers also unlock audio (browsers require a gesture).
  * ===================================================================== */
 
 const Input = (() => {
@@ -1548,39 +1650,325 @@ const Input = (() => {
     KeyM: 'mute',
   };
   const REPEATABLE = new Set(['up', 'down', 'left', 'right']);
+  const T = CONFIG.touch, P = CONFIG.palette, VW = CONFIG.view.width, VH = CONFIG.view.height;
+  const canvas = Render.canvas, footer = document.getElementById('footer');
 
   function emit(action) { Engine.handle(action); }
 
+  // ---------- keyboard ----------
   window.addEventListener('keydown', e => {
     Sound.unlock();
     const action = KEYMAP[e.code];
     if (!action) { if (!e.repeat) emit('any'); return; }
     e.preventDefault();
     if (e.repeat && !REPEATABLE.has(action)) return;
+    if (REPEATABLE.has(action) || action === 'eat') walk = null; // keys take over from a tap-walk
     emit(action);
   });
   window.addEventListener('blur', () => emit('blur'));
-  Render.canvas.addEventListener('pointerdown', () => { Sound.unlock(); Render.canvas.focus(); emit('any'); });
 
-  return { emit };
+  // ---------- touch state ----------
+  // Touch UI shows on coarse-pointer devices, or from the first touch on any device.
+  let touchOn = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  let mode = T.defaultMode;     // 'tap' | 'pad' (saved with the other settings)
+  let walk = null;              // { col, row, t }: tap-to-move target, one step per T.stepMs
+  let onSettings = () => {};
+  Render.hints.touch = touchOn;
+
+  function activateTouch() {
+    if (touchOn) return;
+    touchOn = true;
+    Render.hints.touch = true;
+    layout();
+  }
+
+  // ---------- taps on the canvas ----------
+  function tap(x, y) {
+    const s = Engine.state;
+    if (s.screen === 'attract') { emit('any'); return; }
+    if (s.screen === 'title') emit('any');             // keeps the idle timer awake
+    const hit = Render.hitTest(s, x, y);
+    if (!hit) return;
+    switch (s.screen) {
+      case 'playing': {
+        if (s.lockT > 0) return;                       // ignored during wrong-eat / death lockouts
+        if (hit.col === s.player.col && hit.row === s.player.row) { walk = null; emit('eat'); return; }
+        walk = { col: hit.col, row: hit.row, t: 0, fresh: true };
+        stepWalk();                                    // first step right away, then every T.stepMs
+        return;
+      }
+      case 'title': {
+        if (hit.index === s.menuIndex) { emit('confirm'); return; }
+        const n = CONFIG.menu.length, d = (hit.index - s.menuIndex + n) % n;
+        const dir = d <= n / 2 ? 'down' : 'up';
+        for (let k = Math.min(d, n - d); k > 0; k--) emit(dir);
+        return;
+      }
+      case 'entername': {
+        if (hit.kind === 'save') { emit('confirm'); return; }
+        for (let k = 0; k < 3 && s.entry && s.entry.pos < hit.index; k++) emit('right');
+        for (let k = 0; k < 3 && s.entry && s.entry.pos > hit.index; k++) emit('left');
+        if (hit.dir && s.entry && s.entry.pos === hit.index) emit(hit.dir);
+        return;
+      }
+      case 'gameover': emit('confirm'); return;
+      case 'paused': emit('pause'); return;
+      default: return;                                 // levelclear: nothing to do
+    }
+  }
+
+  // Walk toward the target along a shortest Manhattan path (the longer axis first).
+  // Stops on arrival, on a new tap, on keys/pad/EAT, or when play is locked or left.
+  function stepWalk() {
+    const s = Engine.state;
+    if (!walk || s.screen !== 'playing' || s.lockT > 0) { walk = null; return; }
+    const p = s.player, dx = walk.col - p.col, dy = walk.row - p.row;
+    if (!dx && !dy) { walk = null; return; }
+    emit(Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    if (!walk) return;
+    walk.t = T.stepMs;
+    if (p.col === walk.col && p.row === walk.row) walk = null;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    Sound.unlock();
+    canvas.focus();
+    if (e.pointerType === 'mouse') emit('any');             // desktop mouse: unchanged
+  });
+  // Touch / pen taps, listened for on the whole page: the grid sits close to the
+  // canvas edge, so a forgiving tap just beside the canvas must count too.
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    if (e.target.closest && e.target.closest('.tbtn, #rotate')) return; // buttons handle themselves
+    Sound.unlock();
+    activateTouch();
+    if (!e.isPrimary) return;                                // second finger (pinch): ignore
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * VW / r.width, y = (e.clientY - r.top) * VH / r.height;
+    const screen = Engine.state.screen;
+    if (e.target !== canvas && screen !== 'playing' && screen !== 'attract') return;
+    if (e.cancelable) e.preventDefault();
+    tap(x, y);
+  });
+
+  // No scrolling, pinch-zoom or double-tap zoom anywhere on the page.
+  const block = e => { if (e.cancelable) e.preventDefault(); };
+  for (const type of ['touchstart', 'touchmove', 'touchend']) canvas.addEventListener(type, block, { passive: false });
+  document.addEventListener('touchmove', block, { passive: false });
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick']) document.addEventListener(type, block);
+  window.addEventListener('touchstart', activateTouch, { passive: true });
+  // iOS only starts audio from touchend / pointerup, not touchstart
+  window.addEventListener('touchend', () => Sound.unlock(), { passive: true });
+  window.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') Sound.unlock(); });
+
+  // ---------- on-screen buttons ----------
+  const css = document.createElement('style');
+  css.textContent = `.tbtn{background:${P.panel};border-color:${P.cellEdge}}
+    .tbtn.down{background:${P.cell};border-color:${P.accent}}
+    #rotate{background:${P.panel};border-color:${P.accent}}`;
+  document.head.appendChild(css);
+
+  const buttons = {};
+  let repeatTimer = null;
+  const stopRepeat = () => { clearTimeout(repeatTimer); repeatTimer = null; };
+  function startRepeat(action) {
+    stopRepeat();
+    repeatTimer = setTimeout(function again() { emit(action); repeatTimer = setTimeout(again, T.stepMs); }, T.padRepeatDelay);
+  }
+  function setLabel(b, str, scale) {
+    if (b.dataset.label === str) return;
+    b.dataset.label = str;
+    b.replaceChildren(Render.label(str, P.number, scale));
+  }
+  function makeButton(id, str, scale, press, repeat) {
+    const b = document.createElement('button');
+    b.id = 'btn-' + id; b.type = 'button'; b.tabIndex = -1; b.className = 'tbtn';
+    b.setAttribute('aria-label', id);
+    b.dataset.scale = scale;
+    setLabel(b, str, scale);
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      Sound.unlock();
+      if (e.pointerType !== 'mouse') activateTouch();
+      try { b.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointers */ }
+      b.classList.add('down');
+      walk = null;
+      press();
+      if (repeat) startRepeat(repeat);
+    });
+    const release = () => { b.classList.remove('down'); stopRepeat(); };
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, release);
+    b.addEventListener('touchstart', block, { passive: false });
+    document.body.appendChild(b);
+    buttons[id] = b;
+  }
+  makeButton('eat', 'Eat', 3, () => emit('eat'));
+  makeButton('pause', 'II', 3, () => emit('pause'));
+  for (const [dir, arrow] of [['up', '↑'], ['down', '↓'], ['left', '←'], ['right', '→']]) makeButton(dir, arrow, 4, () => emit(dir), dir);
+  makeButton('touchMode', 'Touch: tap', 2, () => {
+    mode = mode === 'tap' ? 'pad' : 'tap';
+    layout();
+    Sound.play('menu');
+    onSettings();
+  });
+  makeButton('sound', 'Sound: on', 2, () => emit('mute'));
+
+  // Which buttons each screen shows (only once the touch UI is on).
+  let shownKey = '';
+  function syncButtons() {
+    const s = Engine.state, want = new Set();
+    if (touchOn) {
+      if (s.screen === 'playing') {
+        want.add('eat'); want.add('pause');
+        if (mode === 'pad') ['up', 'down', 'left', 'right'].forEach(d => want.add(d));
+      } else if (s.screen === 'paused') want.add('pause');
+      else if (s.screen === 'title') { want.add('touchMode'); want.add('sound'); }
+    }
+    const key = [...want].join() + '|' + mode + '|' + s.muted;
+    if (key === shownKey) return;
+    shownKey = key;
+    setLabel(buttons.touchMode, `Touch: ${mode}`, 2);
+    setLabel(buttons.sound, `Sound: ${s.muted ? 'off' : 'on'}`, 2);
+    for (const [id, b] of Object.entries(buttons)) b.classList.toggle('show', want.has(id) && b.dataset.placed === '1');
+  }
+
+  // ---------- portrait hint ----------
+  const hint = document.createElement('div');
+  hint.id = 'rotate';
+  hint.addEventListener('pointerdown', e => { e.preventDefault(); dismissHint(); });
+  hint.addEventListener('touchstart', block, { passive: false });
+  document.body.appendChild(hint);
+  let hintDone = false, hintTimer = null;
+  function dismissHint() { hintDone = true; clearTimeout(hintTimer); hint.style.display = 'none'; }
+
+  // ---------- layout ----------
+  // The canvas gets the largest whole-number scale that leaves room for the
+  // buttons. Buttons always sit outside the canvas (so never over the grid):
+  //   'plain'   no touch UI: canvas centred above the footer (desktop look)
+  //   'side'    landscape: EAT in one side column, pause + D-pad in the other
+  //   'bottom'  portrait (or when it gives a bigger scale): a row under the canvas
+  // Safe-area insets (notches, iOS home bar) are kept clear.
+  function insets() {
+    const cs = getComputedStyle(document.documentElement), v = n => parseFloat(cs.getPropertyValue(n)) || 0;
+    return { t: v('--sat'), r: v('--sar'), b: v('--sab'), l: v('--sal') };
+  }
+  const fitScale = (w, h) => { const s = Math.min(w / VW, h / VH); return s >= 1 ? Math.floor(s) : Math.max(0.25, s); };
+  let current = null; // last layout, for tests / debugging
+
+  function layout() {
+    const g = T.gap, ins = insets(), vw = window.innerWidth, vh = window.innerHeight;
+    const area = { x: ins.l, y: ins.t, w: vw - ins.l - ins.r, h: vh - ins.t - ins.b };
+    const footH = footer.offsetHeight;
+    const eat = Math.max(56, T.eatSize), pad = Math.max(56, T.padSize), small = T.smallSize;
+    const padBlock = mode === 'pad' ? 3 * pad + 2 * 4 : 0;
+    const colW = Math.max(eat, T.toggleW, small, padBlock) + 2 * g;     // each side column
+    const rowH = Math.max(eat, padBlock, small, T.toggleH) + 2 * g;     // the row under the canvas
+    const portrait = vh > vw;
+    let kind = 'plain', s;
+    if (!touchOn) s = fitScale(area.w - 8, area.h - footH - 8);
+    else {
+      const sSide = fitScale(area.w - 2 * colW, area.h - footH);
+      const sBottom = fitScale(area.w - 2 * g, area.h - footH - rowH);
+      if (portrait || sBottom > sSide) { kind = 'bottom'; s = sBottom; } else { kind = 'side'; s = sSide; }
+    }
+    const cw = Math.round(VW * s), ch = Math.round(VH * s), below = kind === 'bottom' ? rowH : 0;
+    const top = area.y + Math.max(0, Math.floor((area.h - ch - below - footH) / 2));
+    const left = area.x + Math.floor((area.w - cw) / 2);
+    Render.place(left, top, cw, ch);
+    footer.style.top = top + ch + below + 'px';
+
+    const pos = {}, eatRight = T.eatSide !== 'left';
+    const padAt = (x, y) => {
+      if (!padBlock) return;
+      const st = pad + 4;
+      pos.up = [x + st, y, pad, pad]; pos.left = [x, y + st, pad, pad];
+      pos.right = [x + 2 * st, y + st, pad, pad]; pos.down = [x + st, y + 2 * st, pad, pad];
+    };
+    if (kind === 'side') {
+      const colR = { x: left + cw, w: area.x + area.w - (left + cw) }, colL = { x: area.x, w: left - area.x };
+      const eatCol = eatRight ? colR : colL, other = eatRight ? colL : colR, mid = c => c.x + c.w / 2;
+      const bottom = area.y + area.h - g;
+      pos.eat = [mid(eatCol) - eat / 2, bottom - eat, eat, eat];
+      pos.touchMode = [mid(eatCol) - T.toggleW / 2, area.y + g, T.toggleW, T.toggleH];
+      pos.sound = [mid(eatCol) - T.toggleW / 2, area.y + 2 * g + T.toggleH, T.toggleW, T.toggleH];
+      pos.pause = [mid(other) - small / 2, area.y + g, small, small];
+      padAt(mid(other) - padBlock / 2, bottom - padBlock);
+    } else if (kind === 'bottom') {
+      const rowY = top + ch + g, inner = rowH - 2 * g, xL = area.x + g, xR = area.x + area.w - g;
+      const midY = h => rowY + (inner - h) / 2;
+      pos.eat = [eatRight ? xR - eat : xL, midY(eat), eat, eat];
+      if (padBlock) {
+        padAt(eatRight ? xL : xR - padBlock, midY(padBlock));
+        pos.pause = [area.x + area.w / 2 - small / 2, midY(small), small, small];
+      } else {
+        pos.pause = [eatRight ? xL : xR - small, midY(small), small, small];
+      }
+      const both = 2 * T.toggleW + g, tx = area.x + (area.w - both) / 2;
+      pos.touchMode = [tx, midY(T.toggleH), T.toggleW, T.toggleH];
+      pos.sound = [tx + T.toggleW + g, midY(T.toggleH), T.toggleW, T.toggleH];
+    }
+    for (const [id, b] of Object.entries(buttons)) {
+      const p = pos[id];
+      b.dataset.placed = p ? '1' : '0';
+      if (p) Object.assign(b.style, { left: Math.round(p[0]) + 'px', top: Math.round(p[1]) + 'px', width: p[2] + 'px', height: p[3] + 'px' });
+    }
+    shownKey = '';
+    syncButtons();
+
+    // portrait: one-line hint until dismissed or T.rotateHintMs has passed
+    const showHint = touchOn && portrait && !hintDone;
+    hint.style.display = showHint ? 'block' : 'none';
+    if (showHint) {
+      hint.replaceChildren(Render.label('Rotate for best play  ×', P.number, vw >= 340 ? 2 : 1));
+      Object.assign(hint.style, { top: area.y + g + 'px', left: '50%', transform: 'translateX(-50%)' });
+      if (!hintTimer) hintTimer = setTimeout(dismissHint, T.rotateHintMs);
+    }
+    current = { kind, scale: s, canvas: { x: left, y: top, w: cw, h: ch }, portrait };
+  }
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', layout);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+
+  // Called every animation frame by the boot loop.
+  function update(dt) {
+    if (walk) {
+      if (walk.fresh) walk.fresh = false;   // this frame's dt began before the tap: don't count it
+      else walk.t -= dt;
+      if (walk.t <= 0) stepWalk();
+    }
+    syncButtons();
+  }
+
+  return {
+    emit, layout, update,
+    touchActive: () => touchOn,
+    touchMode: () => mode,
+    setTouchMode(m) { if (m === 'tap' || m === 'pad') { mode = m; layout(); } },
+    onSettingsChanged(fn) { onSettings = fn; },
+    layoutInfo: () => current,
+  };
 })();
 
 
 /* ---- boot + main loop ---- */
 document.title = CONFIG.title;
-Engine.loadSave(Storage.load());
+const saved = Storage.load();
+Engine.loadSave(saved);
+Input.setTouchMode(saved && saved.touchMode);
 Sound.setMuted(Engine.state.muted);
+// Saved settings = the engine's data (scores, mute, initials) + the touch layer's mode.
+const saveAll = () => Storage.save({ ...Engine.saveData(), touchMode: Input.touchMode() });
+Input.onSettingsChanged(saveAll);
 window.Chompers = { CONFIG, MODES, MathUtil, ENEMY_TYPES, CAMPAIGN, Engine, Render, Input, Sound, Storage };
-window.addEventListener('resize', Render.fit);
-Render.fit();
+Input.layout();
 Render.canvas.focus();
 
 // Engine events -> sound, saving, hit-stop.
 let hitStop = 0;
 function handleEvents() {
   for (const ev of Engine.drainEvents()) {
-    if (ev === 'save') { Storage.save(Engine.saveData()); continue; }
-    if (ev === 'mute') { Sound.setMuted(Engine.state.muted); Storage.save(Engine.saveData()); Sound.play('menu'); continue; }
+    if (ev === 'save') { saveAll(); continue; }
+    if (ev === 'mute') { Sound.setMuted(Engine.state.muted); saveAll(); Sound.play('menu'); continue; }
     Sound.play(ev);
     if (ev === 'correct' && CONFIG.feel.hitStop) hitStop = CONFIG.feel.hitStopFrames;
   }
@@ -1601,11 +1989,25 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(100, now - last);
   last = now;
+  Input.update(dt);                     // tap-to-move steps, touch button visibility
   step(dt);
   Render.draw(Engine.state, now);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// PWA: manifest + offline service worker, only when served over http(s).
+// Opening chompers.html straight from disk works exactly as before.
+if (/^https?:$/.test(location.protocol)) {
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = 'manifest.json';
+  document.head.appendChild(link);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js?v=' + encodeURIComponent(CONFIG.version), { updateViaCache: 'none' })
+      .catch(err => console.warn('Service worker not registered:', err));
+  }
+}
 </script>
 </body>
 </html>

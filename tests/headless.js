@@ -9,7 +9,9 @@
 // don't interleave.
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const { chromium } = require('playwright');
+const icons = require('./make-icons');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(__dirname, 'out');
@@ -857,7 +859,327 @@ function pageHelpers() {
   await page.waitForTimeout(60);
   await shot('08-enemies');
 
+  // desktop: no touch UI, and a mouse click on the board neither moves nor eats
+  await fresh();
+  const desk = await page.evaluate(() => {
+    const { Engine: E, Input, Render } = Chompers, s = E.state;
+    E.debug.gotoLevel(1);
+    const shown = [...document.querySelectorAll('.tbtn.show')].length;
+    return { touch: Input.touchActive(), shown, hintsTouch: Render.hints.touch, at: [s.player.col, s.player.row] };
+  });
+  const box = await page.locator('#screen').boundingBox();
+  await page.mouse.click(box.x + box.width * 0.1, box.y + box.height * 0.3);
+  await page.waitForTimeout(400);
+  const deskAfter = await page.evaluate(() => { const s = Chompers.Engine.state; return { at: [s.player.col, s.player.row], eaten: s.levelStats.correct + s.levelStats.wrong }; });
+  check(!desk.touch && desk.shown === 0 && !desk.hintsTouch, 'desktop (fine pointer, no touch yet): no touch buttons, keyboard texts');
+  check(JSON.stringify(deskAfter.at) === JSON.stringify(desk.at) && deskAfter.eaten === 0, 'desktop mouse clicks on the board do not move or eat (unchanged)');
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+
+  // ===================== touch + mobile + PWA (served over http) =====================
+  console.log('-- touch, mobile, PWA');
+  const mobileErrors = [];
+  { // own block scope: this section reuses short names (p, g, before, ...)
+  const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
+  const server = http.createServer((req, res) => {
+    const file = path.join(ROOT, decodeURIComponent(new globalThis.URL(req.url, 'http://x').pathname));
+    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    fs.createReadStream(file).pipe(res);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const HTTP = `http://127.0.0.1:${server.address().port}/chompers.html`;
+  async function phone(viewport) {
+    const context = await browser.newContext({ viewport, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const p = await context.newPage();
+    await p.addInitScript(pageHelpers);
+    p.on('pageerror', e => mobileErrors.push(`${viewport.width}x${viewport.height}: ${e.message}`));
+    p.on('console', m => m.type() === 'error' && mobileErrors.push(`${viewport.width}x${viewport.height}: ${m.text()}`));
+    await p.goto(HTTP);
+    await p.waitForTimeout(250);
+    return { context, p };
+  }
+  // tap a point given in canvas pixels (0..320, 0..200)
+  const tapAt = async (p, x, y) => {
+    const r = await p.evaluate(() => { const b = Chompers.Render.canvas.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+    await p.touchscreen.tap(r.x + x * r.w / 320, r.y + y * r.h / 200);
+  };
+  const cellXY = async (p, col, row) => p.evaluate(([c, r]) => {
+    const g = Chompers.Render.geom; return [g.gridX + (c + 0.5) * g.cellW, g.gridY + (r + 0.5) * g.cellH];
+  }, [col, row]);
+  const tapCell = async (p, col, row) => { const [x, y] = await cellXY(p, col, row); await tapAt(p, x, y); };
+  const at = p => p.evaluate(() => [Chompers.Engine.state.player.col, Chompers.Engine.state.player.row].join(','));
+  const rectOf = (p, sel) => p.evaluate(sel => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height, shown: getComputedStyle(e).display !== 'none' }; }, sel);
+  const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  // place the player on a cell that is (want) correct, return its index
+  const putOn = (p, want) => p.evaluate(want => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state, m = E.mode();
+    const i = s.cells.findIndex((c, j) => !c.eaten && m.isCorrect(c.value, s.params) === want && j !== s.player.row * 6 + s.player.col);
+    E.debug.placePlayer(i % CONFIG.grid.cols, Math.floor(i / CONFIG.grid.cols));
+    return i;
+  }, want);
+
+  // ---- landscape phone ----
+  const L = await phone({ width: 844, height: 390 });
+  const p = L.p;
+  const l0 = await p.evaluate(() => ({ touch: Chompers.Input.touchActive(), info: Chompers.Input.layoutInfo(), unlocked: Chompers.Sound.stats.unlocked }));
+  check(l0.touch && l0.info.kind === 'side' && Number.isInteger(l0.info.scale) && l0.info.canvas.w === 320 * l0.info.scale,
+        `landscape phone: touch UI on (coarse pointer), side layout, whole-number scale x${l0.info.scale}`);
+
+  // title by tap: first tap selects, second confirms
+  await tapAt(p, 60, 90 + 3 * 12 + 2);                     // row 4: Practice: Primes
+  const sel1 = await p.evaluate(() => ({ i: Chompers.Engine.state.menuIndex, screen: Chompers.Engine.state.screen, unlocked: Chompers.Sound.stats.unlocked }));
+  await tapAt(p, 60, 90 + 3 * 12 + 2);
+  const started = await p.evaluate(() => ({ screen: Chompers.Engine.state.screen, track: Chompers.Engine.state.track }));
+  check(!l0.unlocked && sel1.unlocked, 'first touch unlocks the audio context');
+  check(sel1.i === 3 && sel1.screen === 'title' && started.screen === 'playing' && started.track === 'primes',
+        'title: tapping a mode selects it, tapping it again starts it');
+
+  // tap-to-move along a shortest path, one step per stepMs
+  await p.evaluate(() => {
+    Chompers.Engine.debug.gotoLevel(1);                    // stage 1: no Grumps
+    window.__trail = [];
+    (function sample() {
+      const s = Chompers.Engine.state, k = s.player.col + ',' + s.player.row;
+      if (!__trail.length || __trail[__trail.length - 1].k !== k) __trail.push({ k, t: performance.now() });
+      requestAnimationFrame(sample);
+    })();
+  });
+  const start = await at(p);
+  await tapCell(p, 0, 4);
+  await p.waitForFunction(() => { const s = Chompers.Engine.state; return s.player.col === 0 && s.player.row === 4; }, null, { timeout: 3000 }).catch(() => {});
+  const trail = await p.evaluate(() => __trail);
+  const cfg = await p.evaluate(() => Chompers.CONFIG.touch);
+  const steps = trail.slice(trail.findIndex(e => e.k === start));
+  const unit = steps.every((e, i) => { if (!i) return true; const [a, b] = steps[i - 1].k.split(',').map(Number), [c, d] = e.k.split(',').map(Number); return Math.abs(a - c) + Math.abs(b - d) === 1; });
+  const gaps = steps.slice(1).map((e, i) => e.t - steps[i].t);
+  check((await at(p)) === '0,4' && unit && steps.length - 1 === 5,
+        `tap-to-move: ${start} -> 0,4 in ${steps.length - 1} single-cell steps (Manhattan distance 5, no diagonals)`);
+  // timing measured from requestAnimationFrame jitters by a frame either way, so check the average
+  const avgGap = gaps.slice(1).reduce((a, b) => a + b, 0) / (gaps.length - 1);
+  check(avgGap >= cfg.stepMs - 10 && avgGap <= cfg.stepMs + 40,
+        `walk cadence: first step on the tap, then one per ${cfg.stepMs} ms (average ${Math.round(avgGap)} ms; gaps ${gaps.slice(1).map(g => Math.round(g)).join(', ')})`);
+
+  // a new tap cancels the walk in progress
+  await tapCell(p, 5, 4);
+  await p.waitForTimeout(cfg.stepMs * 1.5);
+  await tapCell(p, 0, 0);
+  await p.waitForFunction(() => { const s = Chompers.Engine.state; return s.player.col === 0 && s.player.row === 0; }, null, { timeout: 3000 }).catch(() => {});
+  await p.waitForTimeout(cfg.stepMs * 2);
+  const reroute = await p.evaluate(() => ({ at: Chompers.Engine.state.player.col + ',' + Chompers.Engine.state.player.row, maxCol: Math.max(...__trail.slice(-12).map(e => +e.k.split(',')[0])) }));
+  check(reroute.at === '0,0' && reroute.maxCol < 5, 'a new tap cancels the walk and heads for the new cell');
+
+  // forgiving targets
+  const g = await p.evaluate(() => Chompers.Render.geom);
+  await tapAt(p, g.gridX - g.cellW * 0.4, g.gridY + g.cellH * 1.5);   // left of the grid, row 1
+  await p.waitForTimeout(cfg.stepMs * 3);
+  const forgive = await p.evaluate(g => {
+    const { Render, Engine: E } = Chompers, s = { screen: 'playing' };
+    return { at: E.state.player.col + ',' + E.state.player.row,
+             header: Render.hitTest(s, g.gridX + g.cellW * 2.5, g.gridY - g.cellH * 0.4),
+             edge: Render.hitTest(s, g.gridX + g.cellW * 3, g.gridY + g.cellH * 2.5),   // exactly on a cell border
+             tooFar: Render.hitTest(s, g.gridX - g.cellW * 0.7, g.gridY + g.cellH) };
+  }, g);
+  check(forgive.at === '0,1' && forgive.header && forgive.header.row === 0 && forgive.header.col === 2 && forgive.edge && forgive.tooFar === null,
+        'forgiving taps: up to half a cell outside the grid (even just beside the canvas) count as the nearest cell; further out is ignored');
+
+  // tap on yourself eats; the EAT button eats
+  await putOn(p, true);
+  const c0 = await p.evaluate(() => Chompers.Engine.state.levelStats.correct);
+  const me = await at(p);
+  await tapCell(p, ...me.split(',').map(Number));
+  await p.waitForTimeout(80);
+  const c1 = await p.evaluate(() => Chompers.Engine.state.levelStats.correct);
+  await putOn(p, true);
+  await p.tap('#btn-eat');
+  await p.waitForTimeout(80);
+  const c2 = await p.evaluate(() => Chompers.Engine.state.levelStats.correct);
+  check(c1 === c0 + 1, 'tapping the Chomper\'s own cell eats');
+  check(c2 === c1 + 1, 'the EAT button eats');
+  const eatBtn = await rectOf(p, '#btn-eat');
+  check(eatBtn.shown && eatBtn.w >= 56 && eatBtn.h >= 56, `EAT button is thumb-sized (${eatBtn.w}x${eatBtn.h} px)`);
+
+  // taps during a lockout are ignored
+  await putOn(p, false);
+  const before = await at(p);
+  await tapCell(p, ...before.split(',').map(Number));        // wrong eat -> lockout
+  await p.waitForTimeout(50);
+  const locked = await p.evaluate(() => Chompers.Engine.state.lockT > 0);
+  await tapCell(p, before === '5,0' ? 0 : 5, 0);
+  await p.tap('#btn-eat');
+  await p.waitForTimeout(cfg.stepMs * 2);
+  const during = await at(p);
+  await p.waitForFunction(() => Chompers.Engine.state.lockT <= 0, null, { timeout: 4000 });
+  await p.waitForTimeout(cfg.stepMs * 4);
+  const afterLock = await p.evaluate(() => ({ at: Chompers.Engine.state.player.col + ',' + Chompers.Engine.state.player.row, wrong: Chompers.Engine.state.levelStats.wrong }));
+  check(locked && during === before && afterLock.at === before && afterLock.wrong === 1,
+        'taps (cell and EAT) during a wrong-eat lockout are ignored, and no walk starts after it');
+
+  // pause button + tap to resume
+  await p.tap('#btn-pause');
+  const paused = await p.evaluate(() => Chompers.Engine.state.screen);
+  await tapAt(p, 160, 100);
+  check(paused === 'paused' && (await p.evaluate(() => Chompers.Engine.state.screen)) === 'playing', 'pause button pauses; a tap on the screen resumes');
+
+  // layout: buttons never over the canvas
+  const lCanvas = await rectOf(p, '#screen'), lPause = await rectOf(p, '#btn-pause');
+  check(!overlaps(eatBtn, lCanvas) && !overlaps(lPause, lCanvas) && eatBtn.x >= lCanvas.x + lCanvas.w && lPause.x + lPause.w <= lCanvas.x,
+        'landscape: EAT in the right margin, pause in the left, neither over the canvas');
+  await p.screenshot({ path: path.join(OUT, '15-phone-landscape.png') });
+
+  // pinch and scroll are blocked
+  await p.evaluate(() => {
+    window.__touch = [];
+    for (const type of ['touchstart', 'touchmove']) window.addEventListener(type, e => __touch.push({ type, prevented: e.defaultPrevented, n: e.touches.length }));
+  });
+  const cdp = await L.context.newCDPSession(p);
+  const cb = await p.evaluate(() => { const b = Chompers.Render.canvas.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  const pts = d => [{ x: cb.x - d, y: cb.y, id: 1 }, { x: cb.x + d, y: cb.y, id: 2 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(20) });
+  for (const d of [40, 60, 90]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pts(d) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  // one-finger drag on the empty margin (page scroll attempt)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 120, y: 200, id: 3 }] });
+  for (const y of [170, 120, 60]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 120, y, id: 3 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForTimeout(100);
+  const pinch = await p.evaluate(() => ({
+    moves: __touch.filter(e => e.type === 'touchmove'), two: __touch.some(e => e.n === 2),
+    scale: window.visualViewport ? visualViewport.scale : 1, scrollY: window.scrollY, scrollX: window.scrollX,
+    viewport: document.querySelector('meta[name=viewport]').content,
+    touchAction: [getComputedStyle(document.body).touchAction, getComputedStyle(Chompers.Render.canvas).touchAction],
+  }));
+  check(pinch.two && pinch.moves.length >= 6 && pinch.moves.every(e => e.prevented), `pinch and drag touchmoves are all preventDefault()ed (${pinch.moves.length} events)`);
+  check(pinch.scale === 1 && pinch.scrollX === 0 && pinch.scrollY === 0 && /user-scalable=no/.test(pinch.viewport) && /viewport-fit=cover/.test(pinch.viewport)
+        && pinch.touchAction.every(a => a === 'none'), 'no zoom or scroll: scale 1, scroll 0, viewport meta and touch-action: none');
+
+  // name entry, game over by tap
+  await p.evaluate(() => {
+    const { CONFIG, Engine: E } = Chompers, s = E.state;
+    E.debug.gotoLevel(1);
+    const m = E.mode(), eatWhere = want => {
+      const i = s.cells.findIndex(c => !c.eaten && m.isCorrect(c.value, s.params) === want);
+      E.debug.placePlayer(i % 6, Math.floor(i / 6)); E.handle('eat');
+    };
+    eatWhere(true);
+    for (let k = 0; k < CONFIG.startLives; k++) { eatWhere(false); T.sim(CONFIG.timing.wrongLock + 50); }
+    T.sim(CONFIG.timing.gameOverGuard + 50);
+  });
+  const W2 = 160;
+  await tapAt(p, W2, 68);                    // up arrow over letter 2 -> moves there, A -> B
+  await tapAt(p, W2 + 30, 136);              // down arrow under letter 3 -> A -> Z
+  const ent = await p.evaluate(() => Chompers.Engine.state.entry && Chompers.Engine.state.entry.initials.join(''));
+  await p.screenshot({ path: path.join(OUT, '16-phone-name-entry.png') });
+  await tapAt(p, W2, 167);                   // SAVE
+  const savedName = await p.evaluate(() => ({ screen: Chompers.Engine.state.screen, top: Chompers.Engine.state.hiscores.campaign[0] }));
+  await p.waitForTimeout(800);
+  await tapAt(p, 160, 100);
+  check(ent === 'ABZ' && savedName.screen === 'gameover' && savedName.top && savedName.top.name === 'ABZ',
+        `name entry by tap: per-letter arrows and SAVE ("${ent}")`);
+  check((await p.evaluate(() => Chompers.Engine.state.screen)) === 'title', 'game over: a tap returns to the title');
+
+  // D-pad mode: toggle on the title, saved, pad works
+  await p.tap('#btn-touchMode');
+  const stored = await p.evaluate(() => JSON.parse(localStorage.getItem(Chompers.CONFIG.storage.key)));
+  await p.reload(); await p.waitForTimeout(250);
+  const persisted = await p.evaluate(() => Chompers.Input.touchMode());
+  check(stored && stored.touchMode === 'pad' && persisted === 'pad', 'TOUCH: TAP / PAD toggle on the title, saved with the other settings');
+  await p.evaluate(() => Chompers.Engine.debug.gotoLevel(1));
+  await p.waitForTimeout(80);
+  const pad = {};
+  for (const d of ['up', 'down', 'left', 'right', 'eat', 'pause']) pad[d] = await rectOf(p, '#btn-' + d);
+  const padCanvas = await rectOf(p, '#screen');
+  const padOk = ['up', 'down', 'left', 'right'].every(d => pad[d].shown && pad[d].w >= 56 && pad[d].h >= 56 && !overlaps(pad[d], padCanvas))
+    && !overlaps(pad.eat, padCanvas) && !overlaps(pad.pause, padCanvas)
+    && ['up', 'down', 'left', 'right'].every(d => !overlaps(pad[d], pad.pause) && !overlaps(pad[d], pad.eat));
+  check(padOk, 'PAD mode: four 56 px buttons + EAT + pause, none over the canvas or each other');
+  const p0 = await at(p);
+  await p.tap('#btn-left');
+  const p1 = await at(p);
+  await p.locator('#btn-down').dispatchEvent('pointerdown', { pointerId: 9, pointerType: 'touch', isPrimary: true });
+  await p.waitForTimeout(cfg.padRepeatDelay + cfg.stepMs + 60);
+  await p.locator('#btn-down').dispatchEvent('pointerup', { pointerId: 9, pointerType: 'touch', isPrimary: true });
+  const p2 = await at(p);
+  await p.waitForTimeout(cfg.stepMs * 2);
+  const p3 = await at(p);
+  const [x0, y0] = p0.split(',').map(Number), [x1] = p1.split(',').map(Number), [, y2] = p2.split(',').map(Number);
+  check(x1 === x0 - 1 && y2 >= Math.min(4, y0 + 2) && p3 === p2, `D-pad: tap moves one cell, holding repeats, release stops (${p0} -> ${p1} -> ${p2})`);
+  await p.screenshot({ path: path.join(OUT, '17-phone-pad.png') });
+
+  // ---- PWA: service worker, manifest, icons, offline ----
+  const pwa = await p.evaluate(async () => {
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 5000))]);
+    const link = document.querySelector('link[rel=manifest]');
+    const man = await (await fetch(link.href)).json();
+    const keys = await caches.keys();
+    const cache = await caches.open('chompers-' + Chompers.CONFIG.version);
+    const cached = (await cache.keys()).map(r => new URL(r.url).pathname).sort();
+    const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => r('error'); i.src = src; });
+    const iconSizes = await Promise.all(man.icons.map(i => load(new URL(i.src, link.href).href)));
+    const fav = document.querySelector('link[rel=icon]').href;
+    return { script: reg && reg.active && reg.active.scriptURL, version: Chompers.CONFIG.version, man, keys, cached, iconSizes,
+             favicon: fav.startsWith('data:image/png;base64,') ? await load(fav) : 'not inline',
+             palette: Chompers.CONFIG.palette };
+  });
+  check(pwa.script && pwa.script.endsWith('/sw.js?v=' + pwa.version), `service worker registered and active (${pwa.script && pwa.script.replace(/^.*\//, '')})`);
+  check(pwa.keys.includes('chompers-' + pwa.version) && ['/chompers.html', '/icons/chompers-192.png', '/icons/chompers-512.png', '/manifest.json'].every(f => pwa.cached.includes(f)),
+        `offline cache "chompers-${pwa.version}" holds the page, manifest and icons`);
+  const m = pwa.man;
+  check(m.short_name === 'Chompers' && m.name && m.start_url && m.display === 'standalone' && m.orientation === 'landscape'
+        && m.theme_color === pwa.palette.panel && m.background_color === pwa.palette.bg,
+        'manifest: name, short_name, start_url, standalone, landscape, palette colours');
+  check(pwa.iconSizes.join() === '192x192,512x512,192x192,512x512' && pwa.favicon === '32x32', `icons load at ${[...new Set(pwa.iconSizes)].join(' and ')}, inline favicon ${pwa.favicon}`);
+  const art = icons.readArt();
+  const stale = icons.ICONS.filter(({ file, size }) => !icons.decodePng(fs.readFileSync(path.join(ROOT, file))).px.equals(icons.iconPixels(size, {}, art)));
+  const favNow = await p.evaluate(() => document.querySelector('link[rel=icon]').href);
+  check(stale.length === 0 && favNow === icons.faviconDataUrl(art), 'icons and favicon match the current Chomper sprite (else: node tests/make-icons.js)');
+
+  await L.context.setOffline(true);
+  await p.reload();
+  await p.waitForTimeout(300);
+  const offline = await p.evaluate(() => typeof Chompers === 'object' && Chompers.Engine.state.screen);
+  await L.context.setOffline(false);
+  check(offline === 'title', 'offline: a reload still starts the game from the cache');
+  await L.context.close();
+
+  // ---- portrait phone ----
+  const Pt = await phone({ width: 390, height: 844 });
+  const q = Pt.p;
+  const pInfo = await q.evaluate(() => Chompers.Input.layoutInfo());
+  const hintShown = (await rectOf(q, '#rotate')).shown;
+  const titleBtns = [await rectOf(q, '#btn-touchMode'), await rectOf(q, '#btn-sound')];
+  await q.screenshot({ path: path.join(OUT, '18-phone-portrait-title.png') });
+  await q.evaluate(() => Chompers.Engine.debug.gotoLevel(1));
+  await q.waitForTimeout(80);
+  const qCanvas = await rectOf(q, '#screen'), qEat = await rectOf(q, '#btn-eat'), qPause = await rectOf(q, '#btn-pause');
+  const belowAll = [qEat, qPause, ...titleBtns].every(b => b.y >= qCanvas.y + qCanvas.h && b.y + b.h <= 844);
+  check(pInfo.kind === 'bottom' && Number.isInteger(pInfo.scale) && belowAll && !overlaps(qEat, qPause),
+        'portrait: buttons (and title toggles) sit below the canvas, inside the screen');
+  await q.screenshot({ path: path.join(OUT, '19-phone-portrait-play.png') });
+  await q.tap('#rotate');
+  const hintGone = !(await rectOf(q, '#rotate')).shown;
+  check(hintShown && hintGone, 'portrait: "rotate for best play" hint shows, and a tap dismisses it');
+  await Pt.context.close();
+  const Pt2 = await phone({ width: 390, height: 844 });
+  const h0 = (await rectOf(Pt2.p, '#rotate')).shown;
+  await Pt2.p.waitForTimeout(cfg.rotateHintMs + 300);
+  const h1 = (await rectOf(Pt2.p, '#rotate')).shown;
+  check(h0 && !h1, `portrait hint disappears by itself after ${cfg.rotateHintMs / 1000} s`);
+  await Pt2.context.close();
+
+  // ---- tablet (landscape, roomy): whatever layout wins, buttons stay off the canvas ----
+  const Tb = await phone({ width: 1024, height: 768 });
+  await Tb.p.evaluate(() => Chompers.Engine.debug.gotoLevel(1));
+  await Tb.p.waitForTimeout(80);
+  const tInfo = await Tb.p.evaluate(() => Chompers.Input.layoutInfo());
+  const tCanvas = await rectOf(Tb.p, '#screen'), tEat = await rectOf(Tb.p, '#btn-eat'), tPause = await rectOf(Tb.p, '#btn-pause');
+  check(!overlaps(tEat, tCanvas) && !overlaps(tPause, tCanvas) && tInfo.scale >= 2,
+        `tablet 1024x768: ${tInfo.kind} layout at x${tInfo.scale}, buttons off the canvas`);
+  await Tb.context.close();
+  server.close();
+  }
+
+  check(mobileErrors.length === 0, 'touch/PWA pages: no page or console errors' + (mobileErrors.length ? ': ' + mobileErrors.join(' | ') : ''));
   await browser.close();
   console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
   process.exit(failures ? 1 : 0);
