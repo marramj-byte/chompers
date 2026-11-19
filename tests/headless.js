@@ -55,6 +55,15 @@ function pageHelpers() {
     invalid(id, v, p) {
       const { CONFIG } = Chompers;
       if (String(v).length > CONFIG.profile.board.maxChars) return `"${v}" longer than ${CONFIG.profile.board.maxChars}`;
+      if (id === 'addition' || id === 'subtraction') {
+        const op = id === 'addition' ? '+' : '−';
+        const m = typeof v === 'string' && /^(\d+)([+−])(\d+)$/.exec(v);
+        if (!m || m[2] !== op) return `"${v}" is not an ${id} cell`;
+        const a = +m[1], b = +m[3], x = T.jsEval(v), [lo, hi] = p.operand;
+        if (a < lo || a > hi || b < lo || b > hi) return `"${v}" operands outside ${lo}..${hi}`;
+        if (!Number.isInteger(x) || x < 0 || x > 20) return `"${v}" = ${x} (must be 0..20)`;
+        return null;
+      }
       if (id === 'equals' && p.plain) {
         return Number.isInteger(v) && v >= p.operand[0] && v <= p.operand[1] ? null : `${v} outside ${p.operand}`;
       }
@@ -373,7 +382,7 @@ function pageHelpers() {
   await fresh();
   const boards = await page.evaluate(() => {
     const { MODES, Engine: E } = Chompers, out = {};
-    for (const id of Object.keys(MODES)) {
+    for (const id of Chompers.CONFIG.profile.menu.filter(t => t !== 'campaign')) {
       const len = E.trackStages(id).length;
       const r = { boards: 0, escalated: 0, problems: [], minCorrect: Infinity };
       const sweep = (L, times) => {
@@ -940,18 +949,19 @@ function pageHelpers() {
     const describe = st => {
       const p = st.params;
       if (st.mode === 'multiples') return `x${p.n}<=${p.max}`;
-      if (st.mode === 'primes') return `primes<=${p.max}`;
-      return `${p.variant}${p.plain ? ' plain' : ' ' + p.ops.join('')}${p.plain ? '' : ' ops<=' + p.operand[1]}`;
+      if (st.mode === 'addition') return `add to ${Math.max(...p.ns)}`;
+      if (st.mode === 'subtraction') return `sub within ${p.operand[1]}`;
+      return st.mode;
     };
     return { grid: PR.grid, lives: E.state.lives, menu: PR.menu, stages: PR.campaign.map(describe),
              title: document.title, cols: E.state.cells.length };
   });
-  const SPEC = ['x2<=20', 'x10<=100', 'x5<=50', 'eq + ops<=10', 'x2<=40', 'lt plain', 'eq +− ops<=12', 'gt plain',
-                'x3<=30', 'eq +− ops<=15', 'primes<=20'];
+  const SPEC = ['add to 5', 'add to 10', 'sub within 5', 'sub within 10', 'add to 12', 'sub within 12',
+                'add to 15', 'sub within 15', 'x2<=20', 'x5<=50', 'x3<=30', 'x4<=40'];
   check(jr.title === 'Chompers Jr' && jr.grid.cols === 5 && jr.grid.rows === 4 && jr.cols === 20 && jr.lives === 5,
         `jr: "${jr.title}", ${jr.grid.cols}x${jr.grid.rows} board, ${jr.lives} lives`);
   check(JSON.stringify(jr.stages) === JSON.stringify(SPEC), `jr stages as specified: ${jr.stages.join(' | ')}`);
-  check(jr.menu.join() === 'campaign,multiples,equals,primes', `jr title menu: Adventure + practice for jr modes only (${jr.menu.join(', ')}; no factors)`);
+  check(jr.menu.join() === 'campaign,addition,subtraction,multiples', `jr title menu: campaign + exactly three practice tracks (${jr.menu.join(', ')})`);
 
   const jrBoards = await page.evaluate(() => {
     const { CONFIG, Engine: E } = Chompers, PR = CONFIG.profile, out = { boards: 0, problems: [], minCorrect: Infinity };
@@ -984,7 +994,7 @@ function pageHelpers() {
       esc.push(cur); prev = cur;
     }
     return {
-      maxPerStage: Math.max(...stageGrumps.map(e => e.count)),
+      perStage: stageGrumps.map(e => e.count),
       stageTypes: [...new Set(stageGrumps.flatMap(e => e.types))],
       escTypes: [...new Set(esc.flatMap(st => st.enemies.types))],
       allSafe: PR.campaign.every(st => st.safeCell) && esc.every(st => st.safeCell),
@@ -1002,8 +1012,9 @@ function pageHelpers() {
     const r = regSnap[i];
     return j.n <= r.enemies.count && j.tick * 1600 >= r.enemies.tickMult * 1040 && j.safe >= r.safeDuration && j.range <= r.rangeScale;
   });
-  check(jrRules.maxPerStage <= 1 && jrRules.stageTypes.join() === 'wanderer' && jrRules.slowWanderer,
-        'jr stages: at most one Grump, always a (slower) Wanderer');
+  check(jrRules.perStage.slice(0, 4).every(n => n === 0) && jrRules.perStage.slice(4).every(n => n === 1)
+        && jrRules.stageTypes.join() === 'wanderer' && jrRules.slowWanderer,
+        `jr stages: no Grumps on 1-4, one slow Wanderer from stage 5 (${jrRules.perStage.join(' ')})`);
   check(jrRules.escTypes.includes('stalker') && jrRules.stalkerRandom >= 0.5,
         `jr Stalkers only appear in escalation, and wander a lot (randomStepChance ${jrRules.stalkerRandom})`);
   check(jrRules.allSafe && jrRules.safeMs >= 2 * jrRules.regularSafeMs, `jr safe cell on every stage, lasting ${jrRules.safeMs / 1000} s`);
@@ -1012,6 +1023,36 @@ function pageHelpers() {
   check(jrRules.lock < jrRules.regularLock && jrRules.feel.deathFlash === false && jrRules.feel.hitStop === true,
         `jr feel: wrong-eat lockout ${jrRules.lock} ms (regular ${jrRules.regularLock}), no death flash, hit-stop on`);
 
+  const jrLimits = await page.evaluate(() => {
+    const { CONFIG, Engine: E, MathUtil } = Chompers, PR = CONFIG.profile;
+    const out = { maxResult: 0, maxBase: 0, modes: new Set(), escModes: new Set(), boards: 0 };
+    for (const track of PR.menu) {
+      const len = E.trackStages(track).length;
+      for (let L = 1; L <= len + 100; L++) {
+        const st = E.stageFor(track, L);
+        out.modes.add(st.modeId);
+        if (L > len) out.escModes.add(st.modeId);
+        if (st.modeId === 'multiples') out.maxBase = Math.max(out.maxBase, st.params.n);
+        if (L <= len + 40) for (let k = 0; k < 10; k++) {          // look at the actual cells too
+          E.debug.gotoLevel(L, track); out.boards++;
+          for (const c of E.state.cells) if (typeof c.value === 'string') {
+            const [, a, , b] = /^(\d+)([+−])(\d+)$/.exec(c.value);
+            out.maxResult = Math.max(out.maxResult, MathUtil.evalExpr(c.value), +a, +b);
+          }
+        }
+      }
+    }
+    const rot = Array.from({ length: 24 }, (_, i) => E.stageFor('campaign', PR.campaign.length + 1 + i))
+      .map(st => (st.modeId === 'multiples' ? 'x' + st.params.n : st.modeId[0])).join(' ');
+    return { ...out, modes: [...out.modes].sort(), escModes: [...out.escModes].sort(), rot };
+  });
+  check(jrLimits.maxResult <= 20 && jrLimits.maxBase <= 5,
+        `jr: no +/− number or result above 20 (max ${jrLimits.maxResult}) and no multiples base above 5 (max ${jrLimits.maxBase}), over 100 stages past the end of every track and ${jrLimits.boards} boards`);
+  check(jrLimits.modes.join() === 'addition,multiples,subtraction' && jrLimits.escModes.join() === 'addition,multiples,subtraction',
+        'jr: only addition, subtraction and multiples, configured or escalated (no primes, factors or equals)');
+  check(jrLimits.rot === 'a s x2 a s x5 a s x3 a s x4 a s x2 a s x5 a s x3 a s x4',
+        `jr escalation rotates addition / subtraction / multiples 2, 5, 3, 4 (${jrLimits.rot.split(' ').slice(0, 12).join(' ')} ...)`);
+
   // friendlier wrong-eat message, shorter lockout, softer colour, no death flash
   const jrMsg = await page.evaluate(() => {
     const { CONFIG, Engine: E, MODES, Render } = Chompers, s = E.state, TH = CONFIG.theme;
@@ -1019,9 +1060,11 @@ function pageHelpers() {
     const m = E.mode(), i = s.cells.findIndex(c => !m.isCorrect(c.value, s.params));
     E.debug.placePlayer(i % 5, Math.floor(i / 5)); E.handle('eat');
     const shown = TH.wrongText(s.flash.msg), lock = s.lockT;
-    const plain = TH.wrongText(MODES.equals.explain(12, { variant: 'lt', n: 10 }));
-    const expr = TH.wrongText(MODES.equals.explain('4+3', { variant: 'eq', n: 10 }));
-    const prime = TH.wrongText(MODES.primes.explain(9));
+    const header = E.mode().title(s.params);
+    const add = TH.wrongText(MODES.addition.explain('3+5', { n: 7 }));
+    const sub = TH.wrongText(MODES.subtraction.explain('9−5', { n: 3 }));
+    const mult = TH.wrongText(MODES.multiples.explain(9, { n: 2 }));
+    const titles = [MODES.addition.title({ n: 7 }), MODES.subtraction.title({ n: 3 })];
     // death: draw its first frame and sample a background pixel
     T.sim(CONFIG.profile.timing.wrongLock + 50);
     s.enemies = []; E.debug.setSafe(null, null, 1e9);
@@ -1029,12 +1072,13 @@ function pageHelpers() {
     E.handle(s.player.col < 4 ? 'right' : 'left');
     Render.draw(s, performance.now());
     const px = Array.from(document.getElementById('screen').getContext('2d').getImageData(2, 100, 1, 1).data.slice(0, 3));
-    return { shown, lock, plain, expr, prime, death: TH.deathText(s.flash.msg), deathKind: s.flash.kind, px, bg: TH.palette.bg, bad: TH.palette.bad };
+    return { shown, lock, header, add, sub, mult, titles, death: TH.deathText(s.flash.msg), deathKind: s.flash.kind, px, bg: TH.palette.bg, bad: TH.palette.bad };
   });
-  check(/^\d+ isn't a multiple of 2 — try again!$/.test(jrMsg.shown) && jrMsg.lock === 900,
-        `jr wrong eat: "${jrMsg.shown}" with a ${jrMsg.lock} ms lockout`);
-  check(jrMsg.plain === "12 isn't less than 10 — try again!" && jrMsg.expr === '4+3 = 7, not equal to 10 — try again!' && jrMsg.prime === '9 = 3×3, not prime — try again!',
-        `jr messages for every mode: "${jrMsg.plain}" / "${jrMsg.expr}" / "${jrMsg.prime}"`);
+  check(/^Adds up to [45]$/.test(jrMsg.header) && /^\d+\+\d+ = \d+, not [45] — try again!$/.test(jrMsg.shown) && jrMsg.lock === 900,
+        `jr stage 1 "${jrMsg.header.toUpperCase()}", wrong eat: "${jrMsg.shown}" with a ${jrMsg.lock} ms lockout`);
+  check(jrMsg.titles.join('|') === 'Adds up to 7|Takes away to 3' && jrMsg.add === '3+5 = 8, not 7 — try again!'
+        && jrMsg.sub === '9−5 = 4, not 3 — try again!' && jrMsg.mult === "9 isn't a multiple of 2 — try again!",
+        `jr headers and messages: "${jrMsg.titles.join('" / "').toUpperCase()}" · "${jrMsg.add}" · "${jrMsg.sub}" · "${jrMsg.mult}"`);
   const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   check(jrMsg.deathKind === 'dead' && jrMsg.death === 'Oops! A Grumplet bumped you!' && JSON.stringify(jrMsg.px) === JSON.stringify(hex(jrMsg.bg)),
         `jr caught: "${jrMsg.death}", and no screen flash`);

@@ -277,6 +277,44 @@ const MODES = {
   },
 };
 
+// ---- Jr modes: equal-to with one fixed operator, in kid words ----
+// Thin wrappers over MODES.equals: the same generator, so wrong cells are near-misses
+// (results within ±nearMissSpread of the target) about half the time, plus random fill.
+// Stage params: ns (targets to pick from, or n), operand [lo, hi].
+// widen(p, f) grows the operand range (never past maxOperand, never shrinking a stage's
+// own range) and the targets, but only to targets that still have board.minCorrect
+// different correct cells, so escalated boards can always be filled.
+function fixedOpMode({ op, name, title, maxOperand }) {
+  return {
+    name, op, maxOperand, title,
+    setup: pickN,
+    asEquals(p) { return { ...p, variant: 'eq', ops: [op] }; },
+    isCorrect(v, p) { return MODES.equals.isCorrect(v, this.asEquals(p)); },
+    makeValue(p, want, rnd) { return MODES.equals.makeValue(this.asEquals(p), want, rnd); },
+    explain: (v, p) => `${v} = ${MathUtil.evalExpr(v)}, not ${p.n}`,
+    // how many different cells "a op b" (operands lo..hi, never negative) equal t
+    ways(t, lo, hi) {
+      let n = 0;
+      for (let a = lo; a <= hi; a++) for (let b = lo; b <= hi; b++) {
+        if (op === '−' && a < b) continue;
+        if (MathUtil.evalExpr(`${a}${op}${b}`) === t) n++;
+      }
+      return n;
+    },
+    widen(p, f) {
+      const [lo, hi0] = p.operand;
+      const hi = Math.max(hi0, Math.min(this.maxOperand, Math.round(hi0 * f)));
+      const need = CONFIG.profile.board.minCorrect;
+      const grow = n => { let t = Math.round(n * f); while (t > n && this.ways(t, lo, hi) < need) t--; return t; };
+      return { ...p, operand: [lo, hi], ns: [...new Set((Array.isArray(p.ns) ? p.ns : [p.n]).map(grow))] };
+    },
+  };
+}
+// "ADDS UP TO 7": 3+4, 2+5, 6+1. Operands 0..10, so no sum is ever above 20.
+MODES.addition = fixedOpMode({ op: '+', name: 'Addition', title: p => `Adds up to ${p.n}`, maxOperand: 10 });
+// "TAKES AWAY TO 3": 7−4, 9−6. Never negative; escalation grows operands only up to 12.
+MODES.subtraction = fixedOpMode({ op: '−', name: 'Subtraction', title: p => `Takes away to ${p.n}`, maxOperand: 12 });
+
 // Grump movement, shared by every profile's Grump kit. move(e, w, t) returns a
 // direction [dc, dr] to step, or null to stay put.
 //   e: { col, row, dir }   t: the Grump type entry (for its tunables)
@@ -346,21 +384,23 @@ const REGULAR_CAMPAIGN = [
 ];
 
 // Chompers Jr: gentle stages for younger kids on a 5x4 board (20 cells, so every
-// range below holds at least 20 unique values). No factors. At most one slow
-// Wanderer per stage; Stalkers only show up in escalation.
+// range below holds at least 20 unique cells). Addition and subtraction first, then
+// small multiples. No Grumps on stages 1-4, one slow Wanderer from stage 5.
+// "Addition to N": targets up to N.  "Subtraction within N": every number up to N.
 const JR1 = { count: 1, types: ['wanderer'], spawnDelay: 6000, tickMult: 1.0 };
 const JR_CAMPAIGN = [
-  /*  1 */ { mode: 'multiples', params: { n: 2, max: 20 },                                                   safeCell: true },
-  /*  2 */ { mode: 'multiples', params: { n: 10, max: 100 },                                                 safeCell: true },
-  /*  3 */ { mode: 'multiples', params: { n: 5, max: 50 },                                                   safeCell: true, enemies: JR1 },
-  /*  4 */ { mode: 'equals',    params: { variant: 'eq', ns: [8, 10], ops: ['+'], operand: [1, 10] },        safeCell: true, enemies: JR1 },
-  /*  5 */ { mode: 'multiples', params: { n: 2, max: 40 },                                                   safeCell: true, enemies: JR1 },
-  /*  6 */ { mode: 'equals',    params: { variant: 'lt', ns: [10], plain: true, operand: [1, 25] },          safeCell: true, enemies: JR1 },
-  /*  7 */ { mode: 'equals',    params: { variant: 'eq', ns: [10, 12], ops: ['+', '−'], operand: [1, 12] },  safeCell: true, enemies: JR1 },
-  /*  8 */ { mode: 'equals',    params: { variant: 'gt', ns: [10, 15], plain: true, operand: [1, 30] },      safeCell: true, enemies: JR1 },
-  /*  9 */ { mode: 'multiples', params: { n: 3, max: 30 },                                                   safeCell: true, enemies: JR1 },
-  /* 10 */ { mode: 'equals',    params: { variant: 'eq', ns: [12, 15], ops: ['+', '−'], operand: [1, 15] },  safeCell: true, enemies: JR1 },
-  /* 11 */ { mode: 'primes',    params: { max: 20 },                                                         safeCell: true, enemies: JR1 },
+  /*  1 */ { mode: 'addition',    params: { ns: [4, 5], operand: [0, 5] },                  safeCell: true },
+  /*  2 */ { mode: 'addition',    params: { ns: [6, 7, 8, 9, 10], operand: [0, 10] },      safeCell: true },
+  /*  3 */ { mode: 'subtraction', params: { ns: [1, 2], operand: [0, 5] },                  safeCell: true },
+  /*  4 */ { mode: 'subtraction', params: { ns: [2, 3, 4, 5], operand: [0, 10] },           safeCell: true },
+  /*  5 */ { mode: 'addition',    params: { ns: [10, 11, 12], operand: [0, 10] },           safeCell: true, enemies: JR1 },
+  /*  6 */ { mode: 'subtraction', params: { ns: [3, 4, 5, 6, 7], operand: [0, 12] },        safeCell: true, enemies: JR1 },
+  /*  7 */ { mode: 'addition',    params: { ns: [13, 14, 15], operand: [0, 10] },           safeCell: true, enemies: JR1 },
+  /*  8 */ { mode: 'subtraction', params: { ns: [5, 6, 7, 8, 9, 10], operand: [0, 15] },   safeCell: true, enemies: JR1 },
+  /*  9 */ { mode: 'multiples',   params: { n: 2, max: 20 },                                safeCell: true, enemies: JR1 },
+  /* 10 */ { mode: 'multiples',   params: { n: 5, max: 50 },                                safeCell: true, enemies: JR1 },
+  /* 11 */ { mode: 'multiples',   params: { n: 3, max: 30 },                                safeCell: true, enemies: JR1 },
+  /* 12 */ { mode: 'multiples',   params: { n: 4, max: 40 },                                safeCell: true, enemies: JR1 },
 ];
 
 // A profile = the RULES of one game. Everything the engine reads comes from here.
@@ -445,6 +485,7 @@ const PROFILES = {
     //   tickMult     = max(min(tickFloor, last), last.tickMult * tickDecay^k)
     //   safe cell    = on, lasting max(min(safeFloor, base), safeCell.duration * safeDecay^k) ms
     //   Grump types  = types;  spawnDelay = last.spawnDelay (or spawnDelay below if it has none)
+    //   stage order  = the track's stages in order, or optional cycle: [campaign stage numbers]
     escalation: {
       rangeStep: 0.1, rangeMax: 3,
       extraEnemyEvery: 4,
@@ -470,13 +511,13 @@ PROFILES.jr = {
   storageKey: 'chompersjr.v1',
   grid: { cols: 5, rows: 4 },
   startLives: 5,
-  menu: ['campaign', 'multiples', 'equals', 'primes'],
+  menu: ['campaign', 'addition', 'subtraction', 'multiples'],
   trackNames: {
-    campaign: 'Adventure', multiples: 'Practice: Multiples',
-    equals: 'Practice: Equal/Less/More', primes: 'Practice: Primes',
+    campaign: 'Adventure', addition: 'Practice: Addition',
+    subtraction: 'Practice: Subtraction', multiples: 'Practice: Multiples',
   },
   scoring: { correct: 5, levelBonus: 10 },
-  board: { correctRatio: 0.45, minCorrect: 5, maxChars: 6 },
+  board: { correctRatio: 0.45, minCorrect: 4, maxChars: 6 }, // 4: "takes away to 2" within 5 has only 4 answers
   timing: {
     wrongLock: 900,       // shorter than regular: back to playing quickly
     goodFlash: 450,
@@ -502,6 +543,8 @@ PROFILES.jr = {
   // same formula as regular, slower and shallower: smaller range steps, a Grump
   // added only every 6 stages (cap 3), speed and safe time drop slowly to high floors
   escalation: {
+    // past stage 12, rotate addition / subtraction / multiples (2, 5, 3, 4): campaign stage numbers
+    cycle: [5, 6, 9, 7, 8, 10, 5, 6, 11, 7, 8, 12],
     rangeStep: 0.05, rangeMax: 2,
     extraEnemyEvery: 6,
     tickDecay: 0.985, tickFloor: 0.7,
@@ -871,7 +914,11 @@ const Engine = (() => {
                safeCell: !!st.safeCell, safeDuration: PR.safeCell.duration, rangeScale: 1, k: 0 };
     }
     const X = PR.escalation, k = level - len;
-    const base = list[(k - 1) % len], last = withDefaults(list[len - 1].enemies), m = MODES[base.mode];
+    // past the end: rotate through escalation.cycle (campaign stage numbers, only those in
+    // this track) if the profile gives one, else through the track's stages in order
+    const cycle = X.cycle ? X.cycle.map(i => PR.campaign[i - 1]).filter(st => list.includes(st)) : [];
+    const order = cycle.length ? cycle : list;
+    const base = order[(k - 1) % order.length], last = withDefaults(list[len - 1].enemies), m = MODES[base.mode];
     const rangeScale = Math.min(X.rangeMax, 1 + X.rangeStep * k);
     const lastTick = last.tickMult || 1, baseSafe = PR.safeCell.duration;
     return {
