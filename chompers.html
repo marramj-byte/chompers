@@ -113,7 +113,7 @@ const CONFIG = {
   escalation: {
     rangeStep: 0.1, rangeMax: 3,
     extraEnemyEvery: 4,
-    tickDecay: 0.97, tickFloor: 0.45,
+    tickDecay: 0.97, tickFloor: 0.45, // multipliers on each type's tickMs, so they scale with it
     safeDecay: 0.93, safeFloor: 2500,
     types: ['wanderer', 'stalker', 'stalker'],
     spawnDelay: 3000,
@@ -336,7 +336,7 @@ const ENEMY_TYPES = {
   wanderer: {
     name: 'Wanderer',
     color: '#f0913c',
-    tickMs: 800,
+    tickMs: 1040,
     altersNumbers: true,
     straightBias: 0.7, // chance to keep its current heading when it can
     move(e, w, t) {
@@ -352,7 +352,7 @@ const ENEMY_TYPES = {
   stalker: {
     name: 'Stalker',
     color: '#d062e8',
-    tickMs: 1000,
+    tickMs: 1300,
     altersNumbers: false,
     randomStepChance: 0.3, // chance a step is random instead of toward the player
     move(e, w, t) {
